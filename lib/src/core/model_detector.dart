@@ -1,5 +1,4 @@
 import 'package:flutter_gemma/core/model.dart';
-import 'package:flutter_gemma/flutter_gemma.dart';
 
 enum InferenceEngineType { gemma, llama }
 
@@ -33,12 +32,6 @@ class ModelDetector {
       return ModelType.deepSeek;
     }
     return ModelType.gemmaIt;
-  }
-
-  bool _isGemmaModel(String fileName) {
-    final gemmaKeywords = ['gemma', 'phi', 'deepseek', '.tflite'];
-
-    return gemmaKeywords.any((keyword) => fileName.contains(keyword));
   }
 
   bool supportsMultimodal(String modelPath) {

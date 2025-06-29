@@ -8,10 +8,7 @@ environment:
   flutter: ">=1.17.0"
 
 dependencies:
-  llama_cpp_dart:
-    git:
-      url: https://github.com/netdur/llama_cpp_dart.git
-      ref: main
+  llama_cpp_dart: ^0.0.9
   flutter_gemma: ^0.9.0
 
   dio: ^5.8.0
@@ -19,7 +16,7 @@ dependencies:
   path_provider: ^2.1.1
 
   objectbox: ^4.3.0
-  objectbox_flutter_libs: any
+  objectbox_flutter_libs: ^4.3.0
 
   path: ^1.8.3
   crypto: ^3.0.3
