@@ -2,7 +2,7 @@ name: llm_toolkit
 description: "A new Flutter package project."
 version: 0.0.2
 homepage: https://github.com/DevMaan707/llm_toolkit
-publish_to: none
+
 environment:
   sdk: ^3.7.2
   flutter: ">=1.17.0"
