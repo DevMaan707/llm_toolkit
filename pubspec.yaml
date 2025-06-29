@@ -1,5 +1,5 @@
 name: llm_toolkit
-description: "A new Flutter package project."
+description: "A comprehensive Flutter SDK for running Large Language Models (LLMs) locally on mobile and desktop devices. Supports multiple inference engines including Gemma (TFLite) and Llama (GGUF) with integrated model discovery, download, and chat capabilities."
 version: 0.0.2
 homepage: https://github.com/DevMaan707/llm_toolkit
 
