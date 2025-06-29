@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:llm_toolkit/llm_toolkit.dart';
 import '../../models/app_models.dart';
 import '../../services/llm_service.dart';
-import '../../utils/formatters.dart';
 import 'package:path_provider/path_provider.dart';
 
 class FileCard extends StatelessWidget {
@@ -26,7 +25,6 @@ class FileCard extends StatelessWidget {
     final downloadProgress = llmService.downloadProgress[downloadKey] ?? 0.0;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors:
@@ -36,14 +34,14 @@ class FileCard extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(
           color: isDownloaded ? Colors.green.shade300 : Colors.grey.shade300,
-          width: 1.5,
+          width: 1,
         ),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(10),
         child: Column(
           children: [
             Row(
@@ -56,31 +54,34 @@ class FileCard extends StatelessWidget {
                         children: [
                           Icon(
                             Icons.insert_drive_file_rounded,
-                            size: 18,
+                            size: 14,
                             color:
                                 isDownloaded
                                     ? Colors.green.shade600
                                     : Colors.grey.shade600,
                           ),
-                          const SizedBox(width: 8),
+                          const SizedBox(width: 6),
                           Expanded(
                             child: Text(
                               file.filename,
                               style: TextStyle(
                                 fontWeight: FontWeight.w600,
-                                fontSize: 14,
+                                fontSize: 12,
                                 color:
                                     isDownloaded
                                         ? Colors.green.shade800
                                         : Colors.grey.shade800,
                               ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
+                          const SizedBox(width: 6),
                           _buildFormatBadge(),
                           if (isDownloaded) ...[
-                            const SizedBox(width: 8),
+                            const SizedBox(width: 6),
                             Container(
-                              padding: const EdgeInsets.all(4),
+                              padding: const EdgeInsets.all(3),
                               decoration: BoxDecoration(
                                 color: Colors.green.shade600,
                                 shape: BoxShape.circle,
@@ -88,18 +89,18 @@ class FileCard extends StatelessWidget {
                               child: const Icon(
                                 Icons.check_rounded,
                                 color: Colors.white,
-                                size: 12,
+                                size: 10,
                               ),
                             ),
                           ],
                         ],
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 6),
                       Row(
                         children: [
                           Icon(
                             Icons.storage_rounded,
-                            size: 14,
+                            size: 10,
                             color: Colors.grey.shade600,
                           ),
                           const SizedBox(width: 4),
@@ -107,7 +108,7 @@ class FileCard extends StatelessWidget {
                             file.size > 0 ? file.sizeFormatted : 'Size unknown',
                             style: TextStyle(
                               color: Colors.grey.shade600,
-                              fontSize: 12,
+                              fontSize: 10,
                               fontWeight: FontWeight.w500,
                             ),
                           ),
@@ -116,7 +117,7 @@ class FileCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 12),
                 _buildActionButton(
                   context,
                   downloadKey,
@@ -127,7 +128,7 @@ class FileCard extends StatelessWidget {
               ],
             ),
             if (isCurrentlyDownloading) ...[
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
               _buildProgressIndicator(downloadProgress),
             ],
           ],
@@ -140,16 +141,16 @@ class FileCard extends StatelessWidget {
     MaterialColor color = file.fileType == 'GGUF' ? Colors.green : Colors.blue;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
         color: color.shade100,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(4),
         border: Border.all(color: color.shade300),
       ),
       child: Text(
         file.fileType,
         style: TextStyle(
-          fontSize: 10,
+          fontSize: 8,
           fontWeight: FontWeight.bold,
           color: color.shade700,
         ),
@@ -166,17 +167,17 @@ class FileCard extends StatelessWidget {
   ) {
     if (isCurrentlyDownloading) {
       return Container(
-        width: 100,
-        height: 36,
+        width: 70,
+        height: 28,
         decoration: BoxDecoration(
           color: Colors.blue.shade100,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(6),
         ),
         child: Center(
           child: Text(
             '${(downloadProgress * 100).toInt()}%',
             style: TextStyle(
-              fontSize: 12,
+              fontSize: 10,
               fontWeight: FontWeight.bold,
               color: Colors.blue.shade700,
             ),
@@ -188,26 +189,28 @@ class FileCard extends StatelessWidget {
     if (isDownloaded) {
       return ElevatedButton.icon(
         onPressed: () => _loadExistingModel(context),
-        icon: const Icon(Icons.play_arrow_rounded, size: 16),
+        icon: const Icon(Icons.play_arrow_rounded, size: 12),
         label: const Text('Load'),
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.green.shade600,
           foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+          textStyle: const TextStyle(fontSize: 10),
         ),
       );
     }
 
     return ElevatedButton.icon(
       onPressed: () => _downloadModel(context),
-      icon: const Icon(Icons.download_rounded, size: 16),
+      icon: const Icon(Icons.download_rounded, size: 12),
       label: const Text('Download'),
       style: ElevatedButton.styleFrom(
         backgroundColor: Colors.blue.shade600,
         foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+        textStyle: const TextStyle(fontSize: 10),
       ),
     );
   }
@@ -220,20 +223,21 @@ class FileCard extends StatelessWidget {
           children: [
             const Text(
               'Downloading...',
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w500),
             ),
             Text(
               '${(progress * 100).toInt()}%',
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
             ),
           ],
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 4),
         LinearProgressIndicator(
           value: progress,
           backgroundColor: Colors.grey.shade300,
           valueColor: AlwaysStoppedAnimation<Color>(Colors.blue.shade600),
-          borderRadius: BorderRadius.circular(4),
+          borderRadius: BorderRadius.circular(2),
+          minHeight: 3,
         ),
       ],
     );
@@ -247,11 +251,12 @@ class FileCard extends StatelessWidget {
           SnackBar(
             content: Row(
               children: [
-                const Icon(Icons.check_circle, color: Colors.white),
+                const Icon(Icons.check_circle, color: Colors.white, size: 16),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     '✅ ${model.name} downloaded and loaded successfully!',
+                    style: const TextStyle(fontSize: 12),
                   ),
                 ),
               ],
@@ -259,7 +264,7 @@ class FileCard extends StatelessWidget {
             backgroundColor: Colors.green.shade600,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(6),
             ),
           ),
         );
@@ -270,15 +275,20 @@ class FileCard extends StatelessWidget {
           SnackBar(
             content: Row(
               children: [
-                const Icon(Icons.error, color: Colors.white),
+                const Icon(Icons.error, color: Colors.white, size: 16),
                 const SizedBox(width: 8),
-                Expanded(child: Text('❌ Error: $e')),
+                Expanded(
+                  child: Text(
+                    '❌ Error: $e',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                ),
               ],
             ),
             backgroundColor: Colors.red.shade600,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(6),
             ),
             duration: const Duration(seconds: 4),
           ),
@@ -289,13 +299,11 @@ class FileCard extends StatelessWidget {
 
   Future<void> _loadExistingModel(BuildContext context) async {
     try {
-      // Get the actual file path
       final appDir = await getApplicationDocumentsDirectory();
       final sanitizedModelId = model.id.replaceAll('/', '_');
       final actualPath =
           '${appDir.path}/models/${sanitizedModelId}_${file.filename}';
 
-      // Create a temporary LocalModel to load
       final localModel = LocalModel(
         name: model.name,
         path: actualPath,
@@ -311,15 +319,20 @@ class FileCard extends StatelessWidget {
           SnackBar(
             content: Row(
               children: [
-                const Icon(Icons.check_circle, color: Colors.white),
+                const Icon(Icons.check_circle, color: Colors.white, size: 16),
                 const SizedBox(width: 8),
-                Expanded(child: Text('✅ ${model.name} loaded successfully!')),
+                Expanded(
+                  child: Text(
+                    '✅ ${model.name} loaded successfully!',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                ),
               ],
             ),
             backgroundColor: Colors.green.shade600,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(6),
             ),
           ),
         );
@@ -330,15 +343,20 @@ class FileCard extends StatelessWidget {
           SnackBar(
             content: Row(
               children: [
-                const Icon(Icons.error, color: Colors.white),
+                const Icon(Icons.error, color: Colors.white, size: 16),
                 const SizedBox(width: 8),
-                Expanded(child: Text('❌ Error loading model: $e')),
+                Expanded(
+                  child: Text(
+                    '❌ Error loading model: $e',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                ),
               ],
             ),
             backgroundColor: Colors.red.shade600,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(6),
             ),
             duration: const Duration(seconds: 4),
           ),

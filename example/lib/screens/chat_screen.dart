@@ -52,6 +52,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
       appBar: _buildAppBar(),
       body: Column(
         children: [
@@ -71,40 +72,80 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       flexibleSpace: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [
-              Theme.of(context).primaryColor,
-              Theme.of(context).primaryColor.withOpacity(0.8),
-            ],
+            colors: [const Color(0xFF1E3A8A), const Color(0xFF3B82F6)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
         ),
       ),
-      leading: IconButton(
-        onPressed: () => Navigator.pop(context),
-        icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+      leading: Container(
+        margin: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: IconButton(
+          onPressed: () => Navigator.pop(context),
+          icon: const Icon(
+            Icons.arrow_back_rounded,
+            color: Colors.white,
+            size: 20,
+          ),
+          padding: EdgeInsets.zero,
+        ),
       ),
-      title: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      title: Row(
         children: [
-          const Text(
-            'Chat Assistant',
-            style: TextStyle(
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(
+              Icons.chat_bubble_rounded,
               color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 18,
+              size: 16,
             ),
           ),
-          Text(
-            'Powered by ${widget.llmService.activeEngine?.name ?? 'Unknown'} Engine',
-            style: const TextStyle(color: Colors.white70, fontSize: 12),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Chat Assistant',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+                Text(
+                  '${widget.llmService.activeEngine?.name ?? 'Unknown'} Engine',
+                  style: const TextStyle(color: Colors.white70, fontSize: 10),
+                ),
+              ],
+            ),
           ),
         ],
       ),
       actions: [
-        IconButton(
-          onPressed: _showChatOptions,
-          icon: const Icon(Icons.more_vert_rounded, color: Colors.white),
+        Container(
+          margin: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: IconButton(
+            onPressed: _showChatOptions,
+            icon: const Icon(
+              Icons.more_vert_rounded,
+              color: Colors.white,
+              size: 18,
+            ),
+            padding: EdgeInsets.zero,
+          ),
         ),
       ],
     );
@@ -114,22 +155,22 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Colors.blue.shade50, AppColors.blueLight],
+        color: Colors.white,
+        border: Border(
+          bottom: BorderSide(color: Colors.grey.shade100, width: 1),
         ),
-        border: Border(bottom: BorderSide(color: Colors.blue.shade100)),
       ),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(6),
+            padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(
-              color: Colors.green.shade600,
+              color: Colors.green.shade100,
               shape: BoxShape.circle,
             ),
-            child: const Icon(
+            child: Icon(
               Icons.check_rounded,
-              color: Colors.white,
+              color: Colors.green.shade600,
               size: 12,
             ),
           ),
@@ -138,15 +179,28 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
             child: Text(
               'Model: ${widget.llmService.selectedModelName ?? 'Unknown'}',
               style: TextStyle(
-                fontSize: 12,
-                color: Colors.blue.shade700,
+                fontSize: 11,
+                color: Colors.grey.shade700,
+                fontWeight: FontWeight.w500,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: Colors.blue.shade50,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(
+              '${_messages.length} msgs',
+              style: TextStyle(
+                fontSize: 9,
+                color: Colors.blue.shade600,
                 fontWeight: FontWeight.w500,
               ),
             ),
-          ),
-          Text(
-            '${_messages.length} messages',
-            style: TextStyle(fontSize: 11, color: Colors.blue.shade600),
           ),
         ],
       ),
@@ -155,23 +209,35 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
 
   Widget _buildMessagesList() {
     if (_messages.isEmpty) {
-      return const Center(
+      return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.chat_bubble_outline_rounded,
-              size: 64,
-              color: Colors.grey,
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.chat_bubble_outline_rounded,
+                size: 40,
+                color: Colors.grey.shade400,
+              ),
             ),
-            SizedBox(height: 16),
-            Text(
+            const SizedBox(height: 16),
+            const Text(
               'Start a conversation',
               style: TextStyle(
-                fontSize: 18,
+                fontSize: 16,
                 color: Colors.grey,
                 fontWeight: FontWeight.w500,
               ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Ask me anything!',
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
             ),
           ],
         ),
@@ -180,7 +246,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
 
     return ListView.builder(
       controller: _scrollController,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       itemCount: _messages.length,
       itemBuilder: (context, index) {
         final message = _messages[index];
@@ -240,7 +306,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       if (_scrollController.hasClients) {
         _scrollController.animateTo(
           _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
+          duration: const Duration(milliseconds: 200),
           curve: Curves.easeOut,
         );
       }
@@ -253,22 +319,22 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       SnackBar(
         content: const Row(
           children: [
-            Icon(Icons.copy_rounded, color: Colors.white, size: 16),
+            Icon(Icons.copy_rounded, color: Colors.white, size: 14),
             SizedBox(width: 8),
-            Text('Message copied to clipboard'),
+            Text('Copied to clipboard', style: TextStyle(fontSize: 12)),
           ],
         ),
         backgroundColor: Colors.green.shade600,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
         duration: const Duration(seconds: 2),
+        margin: const EdgeInsets.all(16),
       ),
     );
   }
 
   void _shareMessage(String text) {
     // Implement share functionality
-    // You might want to use the share_plus package
   }
 
   void _showChatOptions() {
@@ -280,17 +346,17 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
             decoration: const BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(20),
-                topRight: Radius.circular(20),
+                topLeft: Radius.circular(16),
+                topRight: Radius.circular(16),
               ),
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
-                  width: 40,
-                  height: 4,
-                  margin: const EdgeInsets.symmetric(vertical: 12),
+                  width: 32,
+                  height: 3,
+                  margin: const EdgeInsets.symmetric(vertical: 8),
                   decoration: BoxDecoration(
                     color: Colors.grey.shade300,
                     borderRadius: BorderRadius.circular(2),
@@ -300,28 +366,28 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                   padding: EdgeInsets.all(16),
                   child: Text(
                     'Chat Options',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                 ),
-                ListTile(
-                  leading: const Icon(Icons.clear_all_rounded),
-                  title: const Text('Clear Chat'),
+                _buildOptionTile(
+                  icon: Icons.clear_all_rounded,
+                  title: 'Clear Chat',
                   onTap: () {
                     Navigator.pop(context);
                     _clearChat();
                   },
                 ),
-                ListTile(
-                  leading: const Icon(Icons.download_rounded),
-                  title: const Text('Export Chat'),
+                _buildOptionTile(
+                  icon: Icons.download_rounded,
+                  title: 'Export Chat',
                   onTap: () {
                     Navigator.pop(context);
                     _exportChat();
                   },
                 ),
-                ListTile(
-                  leading: const Icon(Icons.settings_rounded),
-                  title: const Text('Generation Settings'),
+                _buildOptionTile(
+                  icon: Icons.settings_rounded,
+                  title: 'Settings',
                   onTap: () {
                     Navigator.pop(context);
                     _showGenerationSettings();
@@ -334,20 +400,43 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     );
   }
 
+  Widget _buildOptionTile({
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+  }) {
+    return ListTile(
+      leading: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(icon, size: 16, color: Colors.grey.shade600),
+      ),
+      title: Text(title, style: const TextStyle(fontSize: 14)),
+      onTap: onTap,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+    );
+  }
+
   void _clearChat() {
     showDialog(
       context: context,
       builder:
           (context) => AlertDialog(
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(12),
             ),
-            title: const Text('Clear Chat'),
-            content: const Text('Are you sure you want to clear all messages?'),
+            title: const Text('Clear Chat', style: TextStyle(fontSize: 16)),
+            content: const Text(
+              'Are you sure you want to clear all messages?',
+              style: TextStyle(fontSize: 13),
+            ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel'),
+                child: const Text('Cancel', style: TextStyle(fontSize: 12)),
               ),
               ElevatedButton(
                 onPressed: () {
@@ -361,7 +450,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                   backgroundColor: Colors.red.shade600,
                   foregroundColor: Colors.white,
                 ),
-                child: const Text('Clear'),
+                child: const Text('Clear', style: TextStyle(fontSize: 12)),
               ),
             ],
           ),
@@ -376,10 +465,14 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     Clipboard.setData(ClipboardData(text: chatText));
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: const Text('Chat exported to clipboard'),
+        content: const Text(
+          'Chat exported to clipboard',
+          style: TextStyle(fontSize: 12),
+        ),
         backgroundColor: Colors.green.shade600,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+        margin: const EdgeInsets.all(16),
       ),
     );
   }

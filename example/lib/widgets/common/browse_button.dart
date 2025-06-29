@@ -20,29 +20,29 @@ class BrowseButton extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(10),
         boxShadow: [
           BoxShadow(
-            color: Colors.purple.withOpacity(0.3),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
+            color: Colors.purple.withOpacity(0.2),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(10),
           onTap: isLoading ? null : onPressed,
           child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16),
+            padding: const EdgeInsets.symmetric(vertical: 12),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 if (isLoading)
                   const SizedBox(
-                    width: 20,
-                    height: 20,
+                    width: 16,
+                    height: 16,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
                       valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
@@ -52,14 +52,14 @@ class BrowseButton extends StatelessWidget {
                   const Icon(
                     Icons.folder_open_rounded,
                     color: Colors.white,
-                    size: 24,
+                    size: 18,
                   ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 8),
                 Text(
                   isLoading ? 'Loading...' : 'Browse & Load Model from Device',
                   style: const TextStyle(
                     fontWeight: FontWeight.w600,
-                    fontSize: 16,
+                    fontSize: 13,
                     color: Colors.white,
                   ),
                 ),

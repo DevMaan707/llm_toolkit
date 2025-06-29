@@ -26,8 +26,11 @@ class DownloadedTab extends StatelessWidget {
                       'Download models from the Search or Recommended tabs',
                   action: ElevatedButton.icon(
                     onPressed: () => _refreshDownloads(context),
-                    icon: const Icon(Icons.refresh_rounded),
-                    label: const Text('Refresh'),
+                    icon: const Icon(Icons.refresh_rounded, size: 16),
+                    label: const Text(
+                      'Refresh',
+                      style: TextStyle(fontSize: 12),
+                    ),
                   ),
                 );
               }
@@ -35,7 +38,7 @@ class DownloadedTab extends StatelessWidget {
               return RefreshIndicator(
                 onRefresh: () => _refreshDownloads(context),
                 child: ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
                   itemCount: llmService.downloadedModels.length,
                   itemBuilder: (context, index) {
                     return LocalModelCard(
@@ -54,7 +57,7 @@ class DownloadedTab extends StatelessWidget {
 
   Widget _buildHeader(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [Colors.blue.shade50, AppColors.blueLight],
@@ -66,20 +69,20 @@ class DownloadedTab extends StatelessWidget {
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [Colors.blue.shade600, Colors.blue.shade700],
               ),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(8),
             ),
             child: const Icon(
               Icons.storage_rounded,
               color: Colors.white,
-              size: 24,
+              size: 18,
             ),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -87,7 +90,7 @@ class DownloadedTab extends StatelessWidget {
                 Text(
                   'Downloaded Models',
                   style: TextStyle(
-                    fontSize: 20,
+                    fontSize: 16,
                     fontWeight: FontWeight.bold,
                     color: Colors.blue.shade800,
                   ),
@@ -99,7 +102,7 @@ class DownloadedTab extends StatelessWidget {
                       '${llmService.downloadedModels.length} models available',
                       style: TextStyle(
                         color: Colors.blue.shade600,
-                        fontSize: 14,
+                        fontSize: 11,
                       ),
                     );
                   },
@@ -109,14 +112,15 @@ class DownloadedTab extends StatelessWidget {
           ),
           ElevatedButton.icon(
             onPressed: () => _refreshDownloads(context),
-            icon: const Icon(Icons.refresh_rounded, size: 16),
-            label: const Text('Refresh'),
+            icon: const Icon(Icons.refresh_rounded, size: 14),
+            label: const Text('Refresh', style: TextStyle(fontSize: 11)),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.blue.shade600,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(6),
               ),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             ),
           ),
         ],
@@ -132,15 +136,18 @@ class DownloadedTab extends StatelessWidget {
           SnackBar(
             content: const Row(
               children: [
-                Icon(Icons.check_circle, color: Colors.white),
+                Icon(Icons.check_circle, color: Colors.white, size: 16),
                 SizedBox(width: 8),
-                Text('Downloaded models refreshed'),
+                Text(
+                  'Downloaded models refreshed',
+                  style: TextStyle(fontSize: 12),
+                ),
               ],
             ),
             backgroundColor: Colors.green.shade600,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(6),
             ),
           ),
         );
@@ -149,11 +156,14 @@ class DownloadedTab extends StatelessWidget {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error refreshing: $e'),
+            content: Text(
+              'Error refreshing: $e',
+              style: const TextStyle(fontSize: 12),
+            ),
             backgroundColor: Colors.red.shade600,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(6),
             ),
           ),
         );

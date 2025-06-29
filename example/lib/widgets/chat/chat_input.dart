@@ -17,7 +17,7 @@ class ChatInput extends StatefulWidget {
 class _ChatInputState extends State<ChatInput> {
   final TextEditingController _controller = TextEditingController();
   final FocusNode _focusNode = FocusNode();
-  bool _isExpanded = false;
+  bool _hasText = false;
 
   @override
   void dispose() {
@@ -29,13 +29,13 @@ class _ChatInputState extends State<ChatInput> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 10,
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
             offset: const Offset(0, -2),
           ),
         ],
@@ -44,92 +44,128 @@ class _ChatInputState extends State<ChatInput> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            IconButton(
-              onPressed: _showInputOptions,
-              icon: Icon(
-                Icons.add_circle_outline_rounded,
-                color: Colors.grey.shade600,
-              ),
-            ),
-            Expanded(
-              child: Container(
-                constraints: const BoxConstraints(maxHeight: 120),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade50,
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: Colors.grey.shade300),
-                ),
-                child: TextField(
-                  controller: _controller,
-                  focusNode: _focusNode,
-                  maxLines: null,
-                  textCapitalization: TextCapitalization.sentences,
-                  decoration: InputDecoration(
-                    hintText: 'Type your message...',
-                    hintStyle: TextStyle(color: Colors.grey.shade500),
-                    border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
-                  ),
-                  onChanged: (text) {
-                    setState(() {
-                      _isExpanded = text.isNotEmpty;
-                    });
-                  },
-                  onSubmitted: widget.isGenerating ? null : _sendMessage,
-                ),
-              ),
-            ),
+            _buildQuickActionsButton(),
             const SizedBox(width: 8),
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              width: 48,
-              height: 48,
-              child:
-                  widget.isGenerating
-                      ? Container(
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade300,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Center(
-                          child: SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                Colors.white,
-                              ),
-                            ),
-                          ),
-                        ),
-                      )
-                      : FloatingActionButton(
-                        onPressed:
-                            _controller.text.trim().isEmpty
-                                ? null
-                                : () => _sendMessage(_controller.text),
-                        backgroundColor:
-                            _controller.text.trim().isEmpty
-                                ? Colors.grey.shade300
-                                : Colors.blue.shade600,
-                        elevation: 2,
-                        child: Icon(
-                          Icons.send_rounded,
-                          color:
-                              _controller.text.trim().isEmpty
-                                  ? Colors.grey.shade600
-                                  : Colors.white,
-                          size: 20,
-                        ),
-                      ),
-            ),
+            Expanded(child: _buildInputField()),
+            const SizedBox(width: 8),
+            _buildSendButton(),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildQuickActionsButton() {
+    return Container(
+      width: 36,
+      height: 36,
+      decoration: BoxDecoration(
+        color: Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: IconButton(
+        onPressed: _showInputOptions,
+        icon: Icon(
+          Icons.add_circle_outline_rounded,
+          color: Colors.grey.shade600,
+          size: 18,
+        ),
+        padding: EdgeInsets.zero,
+      ),
+    );
+  }
+
+  Widget _buildInputField() {
+    return Container(
+      constraints: const BoxConstraints(maxHeight: 100),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.grey.shade200, width: 1),
+      ),
+      child: TextField(
+        controller: _controller,
+        focusNode: _focusNode,
+        maxLines: null,
+        textCapitalization: TextCapitalization.sentences,
+        style: const TextStyle(fontSize: 13),
+        decoration: InputDecoration(
+          hintText: 'Type your message...',
+          hintStyle: TextStyle(color: Colors.grey.shade500, fontSize: 13),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 14,
+            vertical: 10,
+          ),
+        ),
+        onChanged: (text) {
+          setState(() {
+            _hasText = text.trim().isNotEmpty;
+          });
+        },
+        onSubmitted: widget.isGenerating ? null : _sendMessage,
+      ),
+    );
+  }
+
+  Widget _buildSendButton() {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      width: 36,
+      height: 36,
+      child:
+          widget.isGenerating
+              ? Container(
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  shape: BoxShape.circle,
+                ),
+                child: const Center(
+                  child: SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  ),
+                ),
+              )
+              : Container(
+                decoration: BoxDecoration(
+                  gradient:
+                      _hasText
+                          ? LinearGradient(
+                            colors: [
+                              const Color(0xFF3B82F6),
+                              const Color(0xFF1E40AF),
+                            ],
+                          )
+                          : null,
+                  color: _hasText ? null : Colors.grey.shade300,
+                  shape: BoxShape.circle,
+                  boxShadow:
+                      _hasText
+                          ? [
+                            BoxShadow(
+                              color: const Color(0xFF3B82F6).withOpacity(0.3),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ]
+                          : null,
+                ),
+                child: IconButton(
+                  onPressed:
+                      _hasText ? () => _sendMessage(_controller.text) : null,
+                  icon: Icon(
+                    Icons.send_rounded,
+                    color: _hasText ? Colors.white : Colors.grey.shade600,
+                    size: 16,
+                  ),
+                  padding: EdgeInsets.zero,
+                ),
+              ),
     );
   }
 
@@ -139,7 +175,7 @@ class _ChatInputState extends State<ChatInput> {
     widget.onSendMessage(text.trim());
     _controller.clear();
     setState(() {
-      _isExpanded = false;
+      _hasText = false;
     });
   }
 
@@ -152,17 +188,17 @@ class _ChatInputState extends State<ChatInput> {
             decoration: const BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(20),
-                topRight: Radius.circular(20),
+                topLeft: Radius.circular(16),
+                topRight: Radius.circular(16),
               ),
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
-                  width: 40,
-                  height: 4,
-                  margin: const EdgeInsets.symmetric(vertical: 12),
+                  width: 32,
+                  height: 3,
+                  margin: const EdgeInsets.symmetric(vertical: 8),
                   decoration: BoxDecoration(
                     color: Colors.grey.shade300,
                     borderRadius: BorderRadius.circular(2),
@@ -172,39 +208,79 @@ class _ChatInputState extends State<ChatInput> {
                   padding: EdgeInsets.all(16),
                   child: Text(
                     'Quick Actions',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                 ),
-                ListTile(
-                  leading: const Icon(Icons.lightbulb_outline_rounded),
-                  title: const Text('Suggest Topics'),
+                _buildQuickAction(
+                  icon: Icons.lightbulb_outline_rounded,
+                  title: 'Suggest Topics',
+                  subtitle: 'Get conversation starters',
                   onTap: () {
                     Navigator.pop(context);
                     _showTopicSuggestions();
                   },
                 ),
-                ListTile(
-                  leading: const Icon(Icons.history_rounded),
-                  title: const Text('Recent Prompts'),
+                _buildQuickAction(
+                  icon: Icons.history_rounded,
+                  title: 'Recent Prompts',
+                  subtitle: 'Reuse previous messages',
                   onTap: () {
                     Navigator.pop(context);
-                    // Implement recent prompts
                   },
                 ),
-                ListTile(
-                  leading: const Icon(Icons.photo_library_rounded),
-                  title: const Text('Upload Image'),
-                  subtitle: const Text('Coming soon'),
+                _buildQuickAction(
+                  icon: Icons.photo_library_rounded,
+                  title: 'Upload Image',
+                  subtitle: 'Coming soon',
                   enabled: false,
                   onTap: () {
                     Navigator.pop(context);
-                    // Implement image upload
                   },
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
               ],
             ),
           ),
+    );
+  }
+
+  Widget _buildQuickAction({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+    bool enabled = true,
+  }) {
+    return ListTile(
+      leading: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: enabled ? Colors.blue.shade50 : Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(
+          icon,
+          size: 16,
+          color: enabled ? Colors.blue.shade600 : Colors.grey.shade400,
+        ),
+      ),
+      title: Text(
+        title,
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w500,
+          color: enabled ? Colors.black87 : Colors.grey.shade400,
+        ),
+      ),
+      subtitle: Text(
+        subtitle,
+        style: TextStyle(
+          fontSize: 11,
+          color: enabled ? Colors.grey.shade600 : Colors.grey.shade400,
+        ),
+      ),
+      onTap: enabled ? onTap : null,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
     );
   }
 
@@ -216,6 +292,8 @@ class _ChatInputState extends State<ChatInput> {
       'Translate this text to Spanish',
       'Summarize the latest tech news',
       'Give me a recipe for chocolate cake',
+      'What are the benefits of renewable energy?',
+      'How does machine learning work?',
     ];
 
     showModalBottomSheet(
@@ -228,16 +306,16 @@ class _ChatInputState extends State<ChatInput> {
             decoration: const BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(20),
-                topRight: Radius.circular(20),
+                topLeft: Radius.circular(16),
+                topRight: Radius.circular(16),
               ),
             ),
             child: Column(
               children: [
                 Container(
-                  width: 40,
-                  height: 4,
-                  margin: const EdgeInsets.symmetric(vertical: 12),
+                  width: 32,
+                  height: 3,
+                  margin: const EdgeInsets.symmetric(vertical: 8),
                   decoration: BoxDecoration(
                     color: Colors.grey.shade300,
                     borderRadius: BorderRadius.circular(2),
@@ -247,7 +325,7 @@ class _ChatInputState extends State<ChatInput> {
                   padding: EdgeInsets.all(16),
                   child: Text(
                     'Topic Suggestions',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                 ),
                 Expanded(
@@ -256,22 +334,43 @@ class _ChatInputState extends State<ChatInput> {
                     itemCount: suggestions.length,
                     itemBuilder: (context, index) {
                       return Container(
-                        margin: const EdgeInsets.only(bottom: 8),
+                        margin: const EdgeInsets.only(bottom: 6),
                         child: ListTile(
-                          title: Text(suggestions[index]),
-                          trailing: const Icon(
+                          leading: Container(
+                            width: 32,
+                            height: 32,
+                            decoration: BoxDecoration(
+                              color: Colors.blue.shade50,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(
+                              Icons.chat_bubble_outline_rounded,
+                              size: 14,
+                              color: Colors.blue.shade600,
+                            ),
+                          ),
+                          title: Text(
+                            suggestions[index],
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                          trailing: Icon(
                             Icons.arrow_forward_ios_rounded,
-                            size: 16,
+                            size: 12,
+                            color: Colors.grey.shade400,
                           ),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            side: BorderSide(color: Colors.grey.shade300),
+                            borderRadius: BorderRadius.circular(8),
+                            side: BorderSide(color: Colors.grey.shade200),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 4,
                           ),
                           onTap: () {
                             Navigator.pop(context);
                             _controller.text = suggestions[index];
                             setState(() {
-                              _isExpanded = true;
+                              _hasText = true;
                             });
                             _focusNode.requestFocus();
                           },

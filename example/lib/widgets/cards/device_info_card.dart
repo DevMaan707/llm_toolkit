@@ -15,31 +15,31 @@ class DeviceInfoCard extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.blue.shade200),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [Colors.blue.shade600, Colors.blue.shade700],
                     ),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Icon(
                     Icons.phone_android_rounded,
                     color: Colors.white,
-                    size: 24,
+                    size: 18,
                   ),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -47,7 +47,7 @@ class DeviceInfoCard extends StatelessWidget {
                       Text(
                         'Device Information',
                         style: TextStyle(
-                          fontSize: 18,
+                          fontSize: 14,
                           fontWeight: FontWeight.bold,
                           color: Colors.blue.shade800,
                         ),
@@ -56,7 +56,7 @@ class DeviceInfoCard extends StatelessWidget {
                         'System specifications and recommendations',
                         style: TextStyle(
                           color: Colors.blue.shade600,
-                          fontSize: 12,
+                          fontSize: 10,
                         ),
                       ),
                     ],
@@ -64,7 +64,7 @@ class DeviceInfoCard extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 12),
             Row(
               children: [
                 Expanded(
@@ -76,13 +76,13 @@ class DeviceInfoCard extends StatelessWidget {
                         '${deviceInfo.brand} ${deviceInfo.model}',
                         Icons.smartphone_rounded,
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 6),
                       _buildInfoRow(
                         'Android',
                         '${deviceInfo.version} (API ${deviceInfo.sdkInt})',
                         Icons.android_rounded,
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 6),
                       _buildInfoRow(
                         'Memory',
                         '${deviceInfo.availableMemoryMB}MB / ${deviceInfo.totalMemoryMB}MB',
@@ -91,12 +91,12 @@ class DeviceInfoCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 12),
                 Container(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
                     color: Colors.green.shade100,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(8),
                     border: Border.all(color: Colors.green.shade300),
                   ),
                   child: Column(
@@ -104,15 +104,15 @@ class DeviceInfoCard extends StatelessWidget {
                       Icon(
                         Icons.check_circle_rounded,
                         color: Colors.green.shade600,
-                        size: 20,
+                        size: 16,
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 3),
                       Text(
                         deviceInfo.memoryStatus,
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           color: Colors.green.shade700,
-                          fontSize: 10,
+                          fontSize: 8,
                         ),
                         textAlign: TextAlign.center,
                       ),
@@ -121,7 +121,7 @@ class DeviceInfoCard extends StatelessWidget {
                         'Recommended:\n${deviceInfo.recommendedQuantization}',
                         style: TextStyle(
                           color: Colors.green.shade600,
-                          fontSize: 9,
+                          fontSize: 7,
                         ),
                         textAlign: TextAlign.center,
                       ),
@@ -139,12 +139,12 @@ class DeviceInfoCard extends StatelessWidget {
   Widget _buildInfoRow(String label, String value, IconData icon) {
     return Row(
       children: [
-        Icon(icon, size: 16, color: Colors.blue.shade600),
-        const SizedBox(width: 8),
+        Icon(icon, size: 12, color: Colors.blue.shade600),
+        const SizedBox(width: 6),
         Expanded(
           child: RichText(
             text: TextSpan(
-              style: const TextStyle(fontSize: 13),
+              style: const TextStyle(fontSize: 11),
               children: [
                 TextSpan(
                   text: '$label: ',

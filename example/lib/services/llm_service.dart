@@ -47,12 +47,12 @@ class LLMService extends ChangeNotifier {
     _logger.info('🚀 Initializing LLM Service...');
     try {
       LLMToolkit.instance.initialize(
-        huggingFaceApiKey: 'your_hf_token_here', // Replace with actual token
+        huggingFaceApiKey: '..',
         defaultConfig: InferenceConfig.mobile(),
       );
 
       await _loadDeviceInfo();
-      await loadDownloadedModels(); // Make this public
+      await loadDownloadedModels();
       _loadRecommendedModels();
       await _loadFeaturedModels();
 

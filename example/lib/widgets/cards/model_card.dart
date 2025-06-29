@@ -4,7 +4,7 @@ import '../../services/llm_service.dart';
 import '../../utils/formatters.dart';
 import 'file_card.dart';
 
-class ModelCard extends StatelessWidget {
+class ModelCard extends StatefulWidget {
   final ModelInfo model;
   final LLMService llmService;
 
@@ -12,41 +12,116 @@ class ModelCard extends StatelessWidget {
     : super(key: key);
 
   @override
+  State<ModelCard> createState() => _ModelCardState();
+}
+
+class _ModelCardState extends State<ModelCard>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
+  bool _isExpanded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 250),
+      vsync: this,
+    );
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final predictedEngine = ModelDetector.instance.detectEngine(
-      model.compatibleFiles.isNotEmpty
-          ? model.compatibleFiles.first.filename
-          : model.name,
+      widget.model.compatibleFiles.isNotEmpty
+          ? widget.model.compatibleFiles.first.filename
+          : widget.model.name,
     );
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
+      margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
         color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
+        border: Border.all(color: Colors.grey.withOpacity(0.1), width: 1),
       ),
       child: Theme(
-        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        data: Theme.of(context).copyWith(
+          dividerColor: Colors.transparent,
+          expansionTileTheme: const ExpansionTileThemeData(
+            tilePadding: EdgeInsets.zero,
+            childrenPadding: EdgeInsets.zero,
+          ),
+        ),
         child: ExpansionTile(
-          tilePadding: const EdgeInsets.all(20),
-          childrenPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+          onExpansionChanged: (expanded) {
+            setState(() => _isExpanded = expanded);
+            if (expanded) {
+              _animationController.forward();
+            } else {
+              _animationController.reverse();
+            }
+          },
+          tilePadding: const EdgeInsets.all(16),
+          childrenPadding: EdgeInsets.zero,
           leading: _buildModelIcon(predictedEngine),
           title: Text(
-            model.name,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            widget.model.name,
+            style: const TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 14,
+              color: Color(0xFF0F172A),
+              letterSpacing: -0.1,
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
-          subtitle: _buildSubtitle(),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 8),
+              _buildStats(),
+              const SizedBox(height: 10),
+              _buildBadges(predictedEngine),
+            ],
+          ),
+          trailing: AnimatedRotation(
+            turns: _isExpanded ? 0.5 : 0,
+            duration: const Duration(milliseconds: 250),
+            child: Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: const Color(0xFF3B82F6).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(
+                Icons.keyboard_arrow_down_rounded,
+                color: Color(0xFF3B82F6),
+                size: 16,
+              ),
+            ),
+          ),
           children: [
-            _buildDescription(),
-            const SizedBox(height: 16),
-            _buildFilesSection(),
+            FadeTransition(
+              opacity: _fadeAnimation,
+              child: _buildExpandedContent(),
+            ),
           ],
         ),
       ),
@@ -54,153 +129,211 @@ class ModelCard extends StatelessWidget {
   }
 
   Widget _buildModelIcon(InferenceEngineType engine) {
+    final isGemma = engine == InferenceEngineType.gemma;
+
     return Container(
-      width: 56,
-      height: 56,
+      width: 40,
+      height: 40,
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors:
-              engine == InferenceEngineType.gemma
-                  ? [const Color(0xFF3B82F6), const Color(0xFF1E40AF)]
-                  : [const Color(0xFF10B981), const Color(0xFF047857)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
+          colors:
+              isGemma
+                  ? [const Color(0xFF3B82F6), const Color(0xFF1E40AF)]
+                  : [const Color(0xFF059669), const Color(0xFF047857)],
         ),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(10),
         boxShadow: [
           BoxShadow(
-            color: (engine == InferenceEngineType.gemma
-                    ? const Color(0xFF3B82F6)
-                    : const Color(0xFF10B981))
-                .withOpacity(0.3),
+            color: (isGemma ? const Color(0xFF3B82F6) : const Color(0xFF059669))
+                .withOpacity(0.2),
             blurRadius: 8,
-            offset: const Offset(0, 4),
+            offset: const Offset(0, 2),
           ),
         ],
       ),
       child: Icon(
-        engine == InferenceEngineType.gemma
-            ? Icons.psychology_rounded
-            : Icons.memory_rounded,
+        isGemma ? Icons.psychology_rounded : Icons.memory_rounded,
         color: Colors.white,
-        size: 28,
+        size: 20,
       ),
     );
   }
 
-  Widget _buildSubtitle() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildStats() {
+    return Row(
       children: [
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Icon(Icons.download_rounded, size: 16, color: Colors.grey.shade600),
-            const SizedBox(width: 6),
-            Text(
-              '${Formatters.formatNumber(model.downloads)} downloads',
-              style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
-            ),
-          ],
+        _buildStatItem(
+          Icons.download_rounded,
+          Formatters.formatNumber(widget.model.downloads),
+          'downloads',
         ),
-        const SizedBox(height: 8),
-        _buildBadges(),
+        const SizedBox(width: 16),
+        _buildStatItem(
+          Icons.folder_rounded,
+          '${widget.model.compatibleFiles.length}',
+          'files',
+        ),
       ],
     );
   }
 
-  Widget _buildBadges() {
+  Widget _buildStatItem(IconData icon, String value, String label) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 12, color: const Color(0xFF64748B)),
+        const SizedBox(width: 4),
+        RichText(
+          text: TextSpan(
+            style: const TextStyle(fontSize: 11),
+            children: [
+              TextSpan(
+                text: value,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF0F172A),
+                ),
+              ),
+              TextSpan(
+                text: ' $label',
+                style: const TextStyle(
+                  fontWeight: FontWeight.w400,
+                  color: Color(0xFF64748B),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBadges(InferenceEngineType predictedEngine) {
     return Wrap(
-      spacing: 8,
+      spacing: 6,
+      runSpacing: 4,
       children: [
-        _buildEngineBadge(),
-        if (model.ggufFiles.isNotEmpty) _buildFormatBadge('GGUF', Colors.green),
-        if (model.tfliteFiles.isNotEmpty)
-          _buildFormatBadge('TFLite', Colors.blue),
+        _buildEngineBadge(predictedEngine),
+        if (widget.model.ggufFiles.isNotEmpty)
+          _buildFormatBadge('GGUF', const Color(0xFF059669)),
+        if (widget.model.tfliteFiles.isNotEmpty)
+          _buildFormatBadge('TFLite', const Color(0xFF3B82F6)),
       ],
     );
   }
 
-  Widget _buildEngineBadge() {
-    final predictedEngine = ModelDetector.instance.detectEngine(
-      model.compatibleFiles.isNotEmpty
-          ? model.compatibleFiles.first.filename
-          : model.name,
-    );
+  Widget _buildEngineBadge(InferenceEngineType engine) {
+    final isGemma = engine == InferenceEngineType.gemma;
+    final color = isGemma ? const Color(0xFF3B82F6) : const Color(0xFF059669);
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors:
-              predictedEngine == InferenceEngineType.gemma
-                  ? [Colors.blue.shade50, Colors.blue.shade100]
-                  : [Colors.green.shade50, Colors.green.shade100],
-        ),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color:
-              predictedEngine == InferenceEngineType.gemma
-                  ? Colors.blue.shade200
-                  : Colors.green.shade200,
-        ),
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withOpacity(0.2), width: 1),
       ),
-      child: Text(
-        '${predictedEngine.name.toUpperCase()} Engine',
-        style: TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.bold,
-          color:
-              predictedEngine == InferenceEngineType.gemma
-                  ? Colors.blue.shade700
-                  : Colors.green.shade700,
-        ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            isGemma ? Icons.psychology_rounded : Icons.memory_rounded,
+            size: 10,
+            color: color,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            '${engine.name.toUpperCase()}',
+            style: TextStyle(
+              fontSize: 9,
+              fontWeight: FontWeight.w600,
+              color: color,
+              letterSpacing: 0.2,
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildFormatBadge(String format, MaterialColor color) {
+  Widget _buildFormatBadge(String format, Color color) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: color.shade100,
-        borderRadius: BorderRadius.circular(12),
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withOpacity(0.2), width: 1),
       ),
       child: Text(
         format,
         style: TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.bold,
-          color: color.shade700,
+          fontSize: 9,
+          fontWeight: FontWeight.w600,
+          color: color,
+          letterSpacing: 0.3,
         ),
+      ),
+    );
+  }
+
+  Widget _buildExpandedContent() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildDescription(),
+          const SizedBox(height: 12),
+          _buildFilesSection(),
+        ],
       ),
     );
   }
 
   Widget _buildDescription() {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [
-            Colors.grey.shade50,
-            Colors.grey.shade100,
-          ], // Fixed: removed shade25
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
+          colors: [const Color(0xFFF8FAFC), const Color(0xFFF1F5F9)],
         ),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFE2E8F0), width: 1),
       ),
-      child: Text(
-        model.description.isNotEmpty
-            ? model.description
-            : 'No description available',
-        style: TextStyle(
-          color: Colors.grey.shade700,
-          fontSize: 14,
-          height: 1.4,
-        ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: const Color(0xFF3B82F6).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: const Icon(
+              Icons.description_rounded,
+              color: Color(0xFF3B82F6),
+              size: 14,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              widget.model.description.isNotEmpty
+                  ? widget.model.description
+                  : 'No description available for this model.',
+              style: const TextStyle(
+                color: Color(0xFF475569),
+                fontSize: 11,
+                height: 1.4,
+                letterSpacing: 0.1,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -209,54 +342,102 @@ class ModelCard extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Icon(Icons.folder_rounded, color: Colors.blue.shade600, size: 20),
-            const SizedBox(width: 8),
-            Text(
-              'Available Files (${model.compatibleFiles.length})',
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        if (model.compatibleFiles.isEmpty)
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.orange.shade50,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.orange.shade200),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.warning_amber_rounded,
-                  color: Colors.orange.shade600,
-                  size: 20,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'No compatible files available',
-                    style: TextStyle(
-                      color: Colors.orange.shade700,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                const Color(0xFF3B82F6).withOpacity(0.1),
+                const Color(0xFF3B82F6).withOpacity(0.05),
               ],
             ),
-          )
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: const Color(0xFF3B82F6).withOpacity(0.2),
+              width: 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.folder_rounded,
+                color: Color(0xFF3B82F6),
+                size: 14,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                'Available Files (${widget.model.compatibleFiles.length})',
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                  color: Color(0xFF1E40AF),
+                  letterSpacing: 0.1,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 10),
+        if (widget.model.compatibleFiles.isEmpty)
+          _buildNoFilesState()
         else
-          ...model.compatibleFiles
+          ...widget.model.compatibleFiles
               .take(5)
               .map(
-                (file) =>
-                    FileCard(model: model, file: file, llmService: llmService),
+                (file) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: FileCard(
+                    model: widget.model,
+                    file: file,
+                    llmService: widget.llmService,
+                  ),
+                ),
               )
               .toList(),
       ],
+    );
+  }
+
+  Widget _buildNoFilesState() {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFEF3C7),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: const Color(0xFFF59E0B).withOpacity(0.3),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF59E0B).withOpacity(0.2),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: const Icon(
+              Icons.warning_amber_rounded,
+              color: Color(0xFFF59E0B),
+              size: 14,
+            ),
+          ),
+          const SizedBox(width: 8),
+          const Expanded(
+            child: Text(
+              'No compatible files available for this model',
+              style: TextStyle(
+                color: Color(0xFF92400E),
+                fontWeight: FontWeight.w500,
+                fontSize: 11,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

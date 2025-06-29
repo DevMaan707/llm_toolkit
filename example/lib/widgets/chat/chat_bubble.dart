@@ -13,9 +13,9 @@ class ChatBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       margin: EdgeInsets.only(
-        bottom: 12,
-        left: message.isUser ? 48 : 0,
-        right: message.isUser ? 0 : 48,
+        bottom: 8,
+        left: message.isUser ? 40 : 0,
+        right: message.isUser ? 0 : 40,
       ),
       child: Row(
         mainAxisAlignment:
@@ -23,58 +23,65 @@ class ChatBubble extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (!message.isUser) _buildAvatar(false),
-          const SizedBox(width: 8),
+          if (!message.isUser) const SizedBox(width: 6),
           Flexible(
             child: GestureDetector(
               onLongPress: () => _showMessageOptions(context),
               child: Container(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                constraints: BoxConstraints(
+                  maxWidth: MediaQuery.of(context).size.width * 0.75,
+                ),
                 decoration: BoxDecoration(
                   gradient:
                       message.isUser
                           ? LinearGradient(
                             colors: [
-                              Colors.blue.shade600,
-                              Colors.blue.shade700,
+                              const Color(0xFF3B82F6),
+                              const Color(0xFF1E40AF),
                             ],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                           )
                           : LinearGradient(
-                            colors: [
-                              Colors.grey.shade100,
-                              Colors.grey.shade200,
-                            ],
+                            colors: [Colors.white, Colors.grey.shade50],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                           ),
-                  borderRadius: BorderRadius.circular(20).copyWith(
+                  borderRadius: BorderRadius.circular(12).copyWith(
                     bottomRight:
-                        message.isUser ? const Radius.circular(6) : null,
+                        message.isUser ? const Radius.circular(4) : null,
                     bottomLeft:
-                        message.isUser ? null : const Radius.circular(6),
+                        message.isUser ? null : const Radius.circular(4),
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.08),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
+                      color: Colors.black.withOpacity(0.06),
+                      blurRadius: 4,
+                      offset: const Offset(0, 1),
                     ),
                   ],
+                  border:
+                      message.isUser
+                          ? null
+                          : Border.all(color: Colors.grey.shade200, width: 1),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     if (message.error != null) _buildErrorIndicator(),
-                    Text(
+                    SelectableText(
                       message.text,
                       style: TextStyle(
                         color: message.isUser ? Colors.white : Colors.black87,
-                        fontSize: 15,
-                        height: 1.4,
+                        fontSize: 13,
+                        height: 1.3,
                       ),
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 4),
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -84,15 +91,15 @@ class ChatBubble extends StatelessWidget {
                             color:
                                 message.isUser
                                     ? Colors.white.withOpacity(0.7)
-                                    : Colors.grey.shade600,
-                            fontSize: 11,
+                                    : Colors.grey.shade500,
+                            fontSize: 9,
                           ),
                         ),
                         if (message.isUser) ...[
-                          const SizedBox(width: 6),
+                          const SizedBox(width: 4),
                           Icon(
                             Icons.done_all_rounded,
-                            size: 14,
+                            size: 10,
                             color: Colors.white.withOpacity(0.7),
                           ),
                         ],
@@ -103,7 +110,7 @@ class ChatBubble extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(width: 8),
+          if (message.isUser) const SizedBox(width: 6),
           if (message.isUser) _buildAvatar(true),
         ],
       ),
@@ -112,13 +119,13 @@ class ChatBubble extends StatelessWidget {
 
   Widget _buildAvatar(bool isUser) {
     return Container(
-      width: 32,
-      height: 32,
+      width: 24,
+      height: 24,
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors:
               isUser
-                  ? [Colors.blue.shade400, Colors.blue.shade600]
+                  ? [const Color(0xFF3B82F6), const Color(0xFF1E40AF)]
                   : [Colors.grey.shade400, Colors.grey.shade600],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -127,26 +134,26 @@ class ChatBubble extends StatelessWidget {
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.1),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
+            blurRadius: 2,
+            offset: const Offset(0, 1),
           ),
         ],
       ),
       child: Icon(
         isUser ? Icons.person_rounded : Icons.smart_toy_rounded,
         color: Colors.white,
-        size: 18,
+        size: 12,
       ),
     );
   }
 
   Widget _buildErrorIndicator() {
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
       decoration: BoxDecoration(
         color: Colors.red.shade100,
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(4),
         border: Border.all(color: Colors.red.shade300),
       ),
       child: Row(
@@ -154,14 +161,14 @@ class ChatBubble extends StatelessWidget {
         children: [
           Icon(
             Icons.error_outline_rounded,
-            size: 14,
+            size: 10,
             color: Colors.red.shade600,
           ),
-          const SizedBox(width: 4),
+          const SizedBox(width: 3),
           Text(
             'Error occurred',
             style: TextStyle(
-              fontSize: 11,
+              fontSize: 9,
               color: Colors.red.shade600,
               fontWeight: FontWeight.w500,
             ),
@@ -180,25 +187,32 @@ class ChatBubble extends StatelessWidget {
             decoration: const BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(20),
-                topRight: Radius.circular(20),
+                topLeft: Radius.circular(16),
+                topRight: Radius.circular(16),
               ),
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
-                  width: 40,
-                  height: 4,
-                  margin: const EdgeInsets.symmetric(vertical: 12),
+                  width: 32,
+                  height: 3,
+                  margin: const EdgeInsets.symmetric(vertical: 8),
                   decoration: BoxDecoration(
                     color: Colors.grey.shade300,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
                 ListTile(
-                  leading: const Icon(Icons.copy_rounded),
-                  title: const Text('Copy'),
+                  leading: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Icon(Icons.copy_rounded, size: 14),
+                  ),
+                  title: const Text('Copy', style: TextStyle(fontSize: 13)),
                   onTap: () {
                     Navigator.pop(context);
                     onCopy?.call();
@@ -206,14 +220,21 @@ class ChatBubble extends StatelessWidget {
                 ),
                 if (onShare != null)
                   ListTile(
-                    leading: const Icon(Icons.share_rounded),
-                    title: const Text('Share'),
+                    leading: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Icon(Icons.share_rounded, size: 14),
+                    ),
+                    title: const Text('Share', style: TextStyle(fontSize: 13)),
                     onTap: () {
                       Navigator.pop(context);
                       onShare?.call();
                     },
                   ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
               ],
             ),
           ),

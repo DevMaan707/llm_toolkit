@@ -17,28 +17,28 @@ class ModelStatusCard extends StatelessWidget {
         }
 
         return Container(
-          margin: const EdgeInsets.all(16),
+          margin: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [Colors.green.shade400, Colors.green.shade600],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(12),
             boxShadow: [
               BoxShadow(
-                color: Colors.green.withOpacity(0.3),
-                blurRadius: 12,
-                offset: const Offset(0, 6),
+                color: Colors.green.withOpacity(0.2),
+                blurRadius: 8,
+                offset: const Offset(0, 3),
               ),
             ],
           ),
           child: Padding(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(14),
             child: Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.2),
                     shape: BoxShape.circle,
@@ -46,10 +46,10 @@ class ModelStatusCard extends StatelessWidget {
                   child: const Icon(
                     Icons.check_circle_rounded,
                     color: Colors.white,
-                    size: 28,
+                    size: 20,
                   ),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -59,16 +59,18 @@ class ModelStatusCard extends StatelessWidget {
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
-                          fontSize: 18,
+                          fontSize: 14,
                         ),
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 2),
                       Text(
                         '${llmService.selectedModelName} (${llmService.activeEngine?.name})',
                         style: const TextStyle(
                           color: Colors.white70,
-                          fontSize: 14,
+                          fontSize: 11,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
@@ -76,12 +78,12 @@ class ModelStatusCard extends StatelessWidget {
                 Container(
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(8),
                   ),
                   child: Material(
                     color: Colors.transparent,
                     child: InkWell(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(8),
                       onTap: () {
                         Navigator.push(
                           context,
@@ -93,8 +95,8 @@ class ModelStatusCard extends StatelessWidget {
                       },
                       child: Padding(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
+                          horizontal: 12,
+                          vertical: 8,
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -102,15 +104,15 @@ class ModelStatusCard extends StatelessWidget {
                             Icon(
                               Icons.chat_bubble_rounded,
                               color: Colors.green.shade600,
-                              size: 18,
+                              size: 14,
                             ),
-                            const SizedBox(width: 8),
+                            const SizedBox(width: 6),
                             Text(
                               'Start Chat',
                               style: TextStyle(
                                 fontWeight: FontWeight.w600,
                                 color: Colors.green.shade600,
-                                fontSize: 14,
+                                fontSize: 12,
                               ),
                             ),
                           ],
