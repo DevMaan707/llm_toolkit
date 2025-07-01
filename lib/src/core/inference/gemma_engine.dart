@@ -72,7 +72,7 @@ class GemmaInferenceEngine extends BaseInferenceEngine {
     try {
       final session = await _inferenceModel!.createSession(
         temperature: params.temperature ?? 0.8,
-        randomSeed: params.randomSeed ?? 1,
+        //randomSeed: params.randomSeed ?? 1,
         topK: params.topK ?? 1,
       );
 
@@ -102,7 +102,7 @@ class GemmaInferenceEngine extends BaseInferenceEngine {
     try {
       final session = await _inferenceModel!.createSession(
         temperature: params.temperature ?? 0.8,
-        randomSeed: params.randomSeed ?? 1,
+        //randomSeed: params.randomSeed ?? 1,
         topK: params.topK ?? 1,
       );
 

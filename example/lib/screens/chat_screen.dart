@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'dart:async';
 import '../services/llm_service.dart';
 import '../models/app_models.dart';
 import '../utils/app_colors.dart';
@@ -21,6 +22,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   final ScrollController _scrollController = ScrollController();
   bool _isGenerating = false;
   late AnimationController _animationController;
+  StreamSubscription<String>? _generationSubscription;
 
   @override
   void initState() {
@@ -36,6 +38,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   void dispose() {
     _scrollController.dispose();
     _animationController.dispose();
+    _generationSubscription?.cancel();
     super.dispose();
   }
 
@@ -59,7 +62,11 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
           _buildModelInfo(),
           Expanded(child: _buildMessagesList()),
           if (_isGenerating) const TypingIndicator(),
-          ChatInput(onSendMessage: _sendMessage, isGenerating: _isGenerating),
+          ChatInput(
+            onSendMessage: _sendMessage,
+            onStopGeneration: _stopGeneration,
+            isGenerating: _isGenerating,
+          ),
         ],
       ),
     );
@@ -165,12 +172,20 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
           Container(
             padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(
-              color: Colors.green.shade100,
+              color:
+                  _isGenerating
+                      ? Colors.orange.shade100
+                      : Colors.green.shade100,
               shape: BoxShape.circle,
             ),
             child: Icon(
-              Icons.check_rounded,
-              color: Colors.green.shade600,
+              _isGenerating
+                  ? Icons.hourglass_empty_rounded
+                  : Icons.check_rounded,
+              color:
+                  _isGenerating
+                      ? Colors.orange.shade600
+                      : Colors.green.shade600,
               size: 12,
             ),
           ),
@@ -270,35 +285,95 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
 
     _scrollToBottom();
 
+    // Create AI message with empty text initially
     final aiMessage = ChatMessage(text: '', isUser: false);
     setState(() => _messages.add(aiMessage));
 
     _animationController.forward();
 
-    widget.llmService
+    // Cancel any existing subscription
+    _generationSubscription?.cancel();
+
+    // Start new generation
+    _generationSubscription = widget.llmService
         .generateText(text)
         .listen(
           (token) {
-            setState(() {
-              aiMessage.text += token;
-            });
-            _scrollToBottom();
+            if (mounted) {
+              setState(() {
+                // Find the AI message index and update it
+                final aiMessageIndex = _messages.length - 1;
+                if (aiMessageIndex >= 0 && !_messages[aiMessageIndex].isUser) {
+                  // Create a new ChatMessage object instead of modifying the existing one
+                  _messages[aiMessageIndex] = ChatMessage(
+                    text: _messages[aiMessageIndex].text + token,
+                    isUser: false,
+                    timestamp: _messages[aiMessageIndex].timestamp,
+                  );
+                }
+              });
+
+              // Scroll to bottom after each token
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (_scrollController.hasClients) {
+                  _scrollController.animateTo(
+                    _scrollController.position.maxScrollExtent,
+                    duration: const Duration(milliseconds: 50),
+                    curve: Curves.easeOut,
+                  );
+                }
+              });
+            }
           },
           onDone: () {
-            setState(() => _isGenerating = false);
-            _animationController.reverse();
-            _scrollToBottom();
+            print('Generation completed normally');
+            if (mounted) {
+              setState(() {
+                _isGenerating = false;
+              });
+              _animationController.reverse();
+              _scrollToBottom();
+            }
           },
           onError: (error) {
-            setState(() {
-              aiMessage.text = 'Sorry, I encountered an error: $error';
-              aiMessage.error = error.toString();
-              _isGenerating = false;
-            });
-            _animationController.reverse();
-            _scrollToBottom();
+            print('Generation error: $error');
+            if (mounted) {
+              setState(() {
+                final aiMessageIndex = _messages.length - 1;
+                if (aiMessageIndex >= 0 && !_messages[aiMessageIndex].isUser) {
+                  final currentText = _messages[aiMessageIndex].text;
+                  _messages[aiMessageIndex] = ChatMessage(
+                    text:
+                        currentText.isEmpty
+                            ? 'Sorry, I encountered an error: $error'
+                            : currentText,
+                    isUser: false,
+                    timestamp: _messages[aiMessageIndex].timestamp,
+                    error: error.toString(),
+                  );
+                }
+                _isGenerating = false;
+              });
+              _animationController.reverse();
+              _scrollToBottom();
+            }
           },
+          cancelOnError: true,
         );
+  }
+
+  void _stopGeneration() {
+    print('Stopping generation...');
+    _generationSubscription?.cancel();
+    _generationSubscription = null;
+
+    if (mounted) {
+      setState(() {
+        _isGenerating = false;
+      });
+      _animationController.reverse();
+      _scrollToBottom();
+    }
   }
 
   void _scrollToBottom() {
@@ -441,6 +516,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
               ElevatedButton(
                 onPressed: () {
                   Navigator.pop(context);
+                  _stopGeneration(); // Stop any ongoing generation
                   setState(() {
                     _messages.clear();
                     _addWelcomeMessage();

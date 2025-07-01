@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:llm_toolkit/llm_toolkit.dart';
 import 'package:path_provider/path_provider.dart';
@@ -26,6 +28,8 @@ class LLMService extends ChangeNotifier {
   bool _isLoading = false;
   bool _isSearching = false;
   String _lastSearchQuery = '';
+  StreamController<String>? _textGenerationController;
+  StreamSubscription<String>? _currentGenerationSubscription;
 
   // Getters
   List<ModelInfo> get searchModels => _searchModels;
@@ -70,7 +74,7 @@ class LLMService extends ChangeNotifier {
     }
 
     if (query == _lastSearchQuery && _searchModels.isNotEmpty) {
-      return; // Don't search again for the same query
+      return;
     }
 
     _lastSearchQuery = query;
@@ -193,28 +197,18 @@ class LLMService extends ChangeNotifier {
       if (result != null && result.files.single.path != null) {
         final filePath = result.files.single.path!;
         final fileName = result.files.single.name;
-
         _logger.info('📁 Selected file: $fileName');
-
-        // Copy to models directory
         final appDir = await getApplicationDocumentsDirectory();
         final modelsDir = Directory('${appDir.path}/models');
         if (!await modelsDir.exists()) {
           await modelsDir.create(recursive: true);
         }
-
         final targetPath = '${modelsDir.path}/$fileName';
         final sourceFile = File(filePath);
         await sourceFile.copy(targetPath);
-
         _logger.info('📋 Copied model to: $targetPath');
-
-        // Load the model
         await _loadModelWithConfig(targetPath, fileName);
-
-        // Refresh downloaded models list
         await loadDownloadedModels();
-
         _logger.success('✅ Model browsed and loaded successfully');
         return targetPath;
       } else {
@@ -231,15 +225,12 @@ class LLMService extends ChangeNotifier {
     try {
       await File(model.path).delete();
       await loadDownloadedModels();
-
-      // If this was the loaded model, clear the loaded state
       if (_loadedModelPath == model.path) {
         _loadedModelPath = null;
         _selectedModelName = null;
         _activeEngine = null;
         notifyListeners();
       }
-
       _logger.success('✅ Model deleted successfully');
     } catch (e) {
       _logger.error('❌ Error deleting model', e);
@@ -262,13 +253,53 @@ class LLMService extends ChangeNotifier {
       '💬 Generating text for prompt: "${prompt.substring(0, prompt.length > 50 ? 50 : prompt.length)}..."',
     );
 
-    return LLMToolkit.instance.generateText(
+    // Cancel any existing generation
+    _currentGenerationSubscription?.cancel();
+    _textGenerationController?.close();
+
+    // Create a new stream controller for this generation
+    _textGenerationController = StreamController<String>.broadcast();
+
+    // Get the stream from LLMToolkit and forward it to our controller
+    final toolkitStream = LLMToolkit.instance.generateText(
       prompt,
-      params: params ?? GenerationParams.creative(),
+      params: params ?? GenerationParams.longForm(),
     );
+
+    _currentGenerationSubscription = toolkitStream.listen(
+      (token) {
+        if (!_textGenerationController!.isClosed) {
+          _textGenerationController!.add(token);
+        }
+      },
+      onDone: () {
+        if (!_textGenerationController!.isClosed) {
+          _textGenerationController!.close();
+        }
+      },
+      onError: (error) {
+        if (!_textGenerationController!.isClosed) {
+          _textGenerationController!.addError(error);
+        }
+      },
+      cancelOnError: true,
+    );
+
+    return _textGenerationController!.stream;
   }
 
-  // Make this method public
+  void stopGeneration() {
+    _logger.info('🛑 Stopping text generation...');
+    _currentGenerationSubscription?.cancel();
+    _currentGenerationSubscription = null;
+
+    if (_textGenerationController != null &&
+        !_textGenerationController!.isClosed) {
+      _textGenerationController!.close();
+    }
+    _textGenerationController = null;
+  }
+
   Future<void> loadDownloadedModels() async {
     _logger.info('📁 Loading downloaded models...');
 
@@ -327,7 +358,7 @@ class LLMService extends ChangeNotifier {
         config = InferenceConfig(
           modelType: modelType,
           preferredBackend: PreferredBackend.gpu,
-          maxTokens: 512,
+          maxTokens: 4096,
           supportImage: false,
           maxNumImages: 1,
         );
@@ -462,6 +493,7 @@ class LLMService extends ChangeNotifier {
 
   @override
   void dispose() {
+    _currentGenerationSubscription?.cancel();
     _logger.dispose();
     super.dispose();
   }

@@ -123,7 +123,7 @@ class LLMToolkit {
   Stream<String> generateText(String prompt, {GenerationParams? params}) {
     return _inferenceManager.generateText(
       prompt,
-      params ?? GenerationParams.defaultParams(),
+      params ?? GenerationParams.longForm(),
     );
   }
 
@@ -135,7 +135,7 @@ class LLMToolkit {
     return _inferenceManager.generateMultimodalResponse(
       prompt,
       imagePaths,
-      params ?? GenerationParams.defaultParams(),
+      params ?? GenerationParams.longForm(),
     );
   }
 

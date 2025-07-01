@@ -6,6 +6,7 @@ environment:
   sdk: ^3.7.2
 
 dependencies:
+  syncfusion_flutter_pdf: ^24.1.41
   device_info_plus: ^11.5.0
   file_picker: ^10.2.0
   llm_toolkit:

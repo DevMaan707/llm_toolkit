@@ -5,6 +5,7 @@ import '../widgets/common/loading_overlay.dart';
 import '../widgets/tabs/search_tab.dart';
 import '../widgets/tabs/recommended_tab.dart';
 import '../widgets/tabs/downloaded_tab.dart';
+import '../widgets/tabs/rag_tab.dart'; // Add this import
 import '../widgets/debug/debug_panel.dart';
 import '../widgets/status/model_status_card.dart';
 
@@ -22,7 +23,10 @@ class _ModelBrowserScreenState extends State<ModelBrowserScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(
+      length: 4,
+      vsync: this,
+    ); // Change from 3 to 4
     _llmService.initialize();
   }
 
@@ -61,12 +65,38 @@ class _ModelBrowserScreenState extends State<ModelBrowserScreen>
                   SearchTab(llmService: _llmService),
                   RecommendedTab(llmService: _llmService),
                   DownloadedTab(llmService: _llmService),
+                  RagTab(llmService: _llmService),
                 ],
               ),
             ),
           ],
         ),
       ),
+
+      //floatingActionButton: _buildRagFab(),
     );
   }
+
+  // Widget _buildRagFab() {
+  //   return StreamBuilder<bool>(
+  //     // You might want to listen to RAG service state here
+  //     builder: (context, snapshot) {
+  //       // Only show if we're on RAG tab and have initialized RAG
+  //       if (_tabController.index == 3) {
+  //         return FloatingActionButton.extended(
+  //           onPressed: () {
+  //             // Navigate to RAG chat if initialized
+  //             // You'll need to pass the RAG service instance here
+  //           },
+  //           backgroundColor: Colors.purple.shade600,
+  //           foregroundColor: Colors.white,
+  //           icon: const Icon(Icons.auto_awesome_rounded),
+  //           label: const Text('RAG Chat'),
+  //           elevation: 8,
+  //         );
+  //       }
+  //       return const SizedBox.shrink();
+  //     },
+  //   );
+  // }
 }

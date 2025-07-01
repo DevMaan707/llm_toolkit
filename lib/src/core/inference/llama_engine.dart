@@ -1,4 +1,5 @@
 import 'dart:async' as async;
+import 'dart:async';
 import 'dart:io';
 import 'dart:math' as Math;
 import 'package:llama_cpp_dart/llama_cpp_dart.dart';
@@ -97,7 +98,7 @@ class LlamaInferenceEngine extends BaseInferenceEngine {
       }
 
       final fileName = modelPath.split('/').last.toLowerCase();
-      final problematicQuants = ['q2_k', 'iq1_s', 'iq1_m', 'iq2_xxs'];
+      final problematicQuants = [];
 
       for (String problematicQuant in problematicQuants) {
         if (fileName.contains(problematicQuant)) {
@@ -136,7 +137,6 @@ class LlamaInferenceEngine extends BaseInferenceEngine {
     try {
       _debugLog('Setting library path to: libllama.so');
 
-      // Test library availability by trying to set library path
       try {
         Llama.libraryPath = "libllama.so";
         _nativeLibrariesAvailable = true;
@@ -214,6 +214,7 @@ class LlamaInferenceEngine extends BaseInferenceEngine {
       _debugLog('Step 3: Creating context parameters...');
       final contextParams =
           ContextParams()
+            ..nPredict = 512
             ..nCtx = finalNCtx
             ..nBatch = Math.min(256, finalNCtx ~/ 4)
             ..nThreads = 2
@@ -232,11 +233,10 @@ class LlamaInferenceEngine extends BaseInferenceEngine {
       _debugLog('Step 4: Creating sampling parameters...');
       final samplingParams =
           SamplerParams()
-            ..temp = 0.8
-            ..topK = 40
-            ..topP = 0.9
-            ..minP = 0.05;
-      // Note: repeatPenalty is not available in SamplerParams
+            ..temp = 0.7
+            ..topK = 64
+            ..topP = 0.95
+            ..penaltyRepeat = 1.1;
 
       _debugSuccess('Sampling parameters configured');
 
@@ -334,83 +334,44 @@ class LlamaInferenceEngine extends BaseInferenceEngine {
 
     try {
       _debugLog('Step 1: Setting up response stream...');
-      final completer = async.Completer<void>();
-      final responseController = async.StreamController<String>();
 
       int tokenCount = 0;
-      final maxTokens = params.maxTokens ?? 512;
-      final stopSequences = params.stopSequences ?? [];
-      String generatedText = '';
+      final maxTokens = params.maxTokens ?? 4096;
 
       _debugLog('Step 2: Starting generation...');
+      _debugLog('Max tokens: $maxTokens');
+      _debugLog('Starting generation without stop conditions...');
+
       final stopwatch = Stopwatch()..start();
-
-      // Listen to the parent's response stream (correct API)
-      _llamaParent!.stream.listen(
-        (response) {
-          // Handle different response types based on actual API
-          final token = response.toString(); // Convert response to string
-          generatedText += token;
-          tokenCount++;
-
-          // Check stop sequences
-          bool shouldStop = false;
-          for (String stopSeq in stopSequences) {
-            if (generatedText.endsWith(stopSeq)) {
-              _debugLog('Stop sequence detected: $stopSeq');
-              shouldStop = true;
-              break;
-            }
-          }
-
-          if (shouldStop || tokenCount >= maxTokens) {
-            stopwatch.stop();
-            _debugSuccess('=== GENERATION COMPLETE ===');
-            _debugLog('Total tokens generated: $tokenCount');
-            _debugLog('Generation time: ${stopwatch.elapsedMilliseconds}ms');
-            if (stopwatch.elapsedMilliseconds > 0) {
-              _debugLog(
-                'Tokens per second: ${(tokenCount * 1000 / stopwatch.elapsedMilliseconds).toStringAsFixed(2)}',
-              );
-            }
-            responseController.close();
-            completer.complete();
-            return;
-          }
-
-          responseController.add(token);
-
-          if (tokenCount % 10 == 0) {
-            _debugLog('Generated $tokenCount tokens...');
-          }
-        },
-        onError: (error) {
-          _debugError('Error during generation', error);
-          responseController.addError(
-            InferenceException('Generation failed: $error'),
-          );
-          completer.completeError(error);
-        },
-        onDone: () {
-          stopwatch.stop();
-          _debugSuccess('=== GENERATION COMPLETE (STREAM DONE) ===');
-          responseController.close();
-          if (!completer.isCompleted) {
-            completer.complete();
-          }
-        },
-      );
-
-      // Send the prompt to start generation (correct API)
+      _debugLog('Sending prompt to LlamaParent...');
       _llamaParent!.sendPrompt(prompt);
+      _debugLog('Prompt sent successfully');
 
-      // Yield tokens from the response stream
-      await for (final token in responseController.stream) {
-        yield token;
+      await for (final response in _llamaParent!.stream) {
+        final token = response.toString();
+        if (token.isNotEmpty) {
+          tokenCount++;
+          _debugLog('Token $tokenCount: "$token"');
+          yield token;
+          if (tokenCount % 100 == 0) {
+            _debugLog('Generated $tokenCount tokens so far...');
+          }
+          if (tokenCount >= maxTokens) {
+            _debugLog('Reached max tokens: $tokenCount');
+            break;
+          }
+        }
       }
 
-      // Wait for completion
-      await completer.future;
+      stopwatch.stop();
+      _debugSuccess('=== GENERATION COMPLETE ===');
+      _debugLog('Total tokens generated: $tokenCount');
+      _debugLog('Generation time: ${stopwatch.elapsedMilliseconds}ms');
+      if (stopwatch.elapsedMilliseconds > 0) {
+        _debugLog(
+          'Tokens per second: ${(tokenCount * 1000 / stopwatch.elapsedMilliseconds).toStringAsFixed(2)}',
+        );
+      }
     } catch (e, stackTrace) {
       _debugError('=== GENERATION FAILED ===', e, stackTrace);
       if (e is InferenceException) {

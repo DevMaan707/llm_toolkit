@@ -150,6 +150,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
                   _buildTab(Icons.search_rounded, 'Search'),
                   _buildTab(Icons.star_rounded, 'Recommended'),
                   _buildTab(Icons.storage_rounded, 'Downloaded'),
+                  _buildTab(Icons.article_rounded, 'RAG'),
                 ],
               ),
             ),

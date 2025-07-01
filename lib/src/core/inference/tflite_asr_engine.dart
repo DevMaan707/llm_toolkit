@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 import 'dart:typed_data';
 import 'dart:io';
 import 'dart:math' as math;
@@ -185,26 +186,147 @@ class TFLiteASREngine extends BaseInferenceEngine {
     }
   }
 
-  /// Whisper-specific preprocessing (mel spectrogram)
   List<List<double>> _preprocessForWhisper(List<double> audioSamples) {
-    // Apply pre-emphasis filter
-    final preemphasized = _applyPreemphasis(audioSamples);
+    const int WHISPER_SAMPLE_RATE = 16000;
+    const int WHISPER_N_SAMPLES = 30 * WHISPER_SAMPLE_RATE;
+    List<double> paddedAudio;
+    if (audioSamples.length > WHISPER_N_SAMPLES) {
+      paddedAudio = audioSamples.sublist(0, WHISPER_N_SAMPLES);
+    } else {
+      paddedAudio = [...audioSamples];
+      while (paddedAudio.length < WHISPER_N_SAMPLES) {
+        paddedAudio.add(0.0);
+      }
+    }
+    final melSpectrogram = _computeWhisperMelSpectrogram(paddedAudio);
 
-    // Pad or truncate to 30 seconds (480,000 samples at 16kHz)
-    final targetLength = 30 * _sampleRate;
-    final paddedAudio = _padOrTruncateAudio(preemphasized, targetLength);
-
-    // Convert to mel spectrogram
-    final melSpectrogram = _computeMelSpectrogram(paddedAudio);
-
-    // Whisper expects shape [1, n_mels, time_steps]
+    // Whisper expects shape [1, 80, 3000] for mel spectrogram
     return [melSpectrogram.expand((row) => row).toList()];
   }
 
-  /// Wav2Vec2-specific preprocessing
+  double log10(num x) => log(x) / ln10;
+  // Add this method to your TFLiteASREngine class
+  List<List<double>> _computeSTFT(List<double> audio, int nFFT, int hopLength) {
+    final windowSize = nFFT;
+    final numFrames = ((audio.length - windowSize) / hopLength).floor() + 1;
+    final stftFrames = <List<double>>[];
+
+    for (int frame = 0; frame < numFrames; frame++) {
+      final start = frame * hopLength;
+      final end = math.min(start + windowSize, audio.length);
+
+      // Extract window
+      List<double> window = audio.sublist(start, end);
+
+      // Pad with zeros if necessary
+      if (window.length < windowSize) {
+        window.addAll(List.filled(windowSize - window.length, 0.0));
+      }
+
+      // Apply Hanning window
+      final windowed = _applyHanningWindow(window);
+
+      // Compute FFT magnitude spectrum
+      final fftMagnitude = _computeFFTMagnitude(windowed);
+
+      stftFrames.add(fftMagnitude);
+    }
+
+    return stftFrames;
+  }
+
+  // Enhanced Hanning window implementation
+  List<double> _applyHanningWindow(List<double> signal) {
+    final n = signal.length;
+    final windowed = <double>[];
+
+    for (int i = 0; i < n; i++) {
+      final window = 0.5 - 0.5 * math.cos(2 * math.pi * i / (n - 1));
+      windowed.add(signal[i] * window);
+    }
+
+    return windowed;
+  }
+
+  // Enhanced FFT magnitude computation
+  List<double> _computeFFTMagnitude(List<double> signal) {
+    final n = signal.length;
+    final magnitude = <double>[];
+
+    // Compute only positive frequencies (n/2 + 1)
+    for (int k = 0; k <= n ~/ 2; k++) {
+      double real = 0.0;
+      double imag = 0.0;
+
+      for (int t = 0; t < n; t++) {
+        final angle = -2 * math.pi * k * t / n;
+        real += signal[t] * math.cos(angle);
+        imag += signal[t] * math.sin(angle);
+      }
+
+      magnitude.add(math.sqrt(real * real + imag * imag));
+    }
+
+    return magnitude;
+  }
+
+  List<List<double>> _computeWhisperMelSpectrogram(List<double> audio) {
+    const int N_FFT = 400;
+    const int HOP_LENGTH = 160;
+    const int N_MELS = 80;
+    const int N_SAMPLES = 480000;
+    final melFilters = _createMelFilterBank(N_FFT ~/ 2 + 1, N_MELS, 16000);
+    final stft = _computeSTFT(audio, N_FFT, HOP_LENGTH);
+    final melSpectrogram = <List<double>>[];
+    for (final frame in stft) {
+      final melFrame = <double>[];
+      for (int i = 0; i < N_MELS; i++) {
+        double melValue = 0.0;
+        for (int j = 0; j < frame.length; j++) {
+          melValue += frame[j] * melFilters[i][j];
+        }
+        melFrame.add(math.log(math.max(melValue, 1e-10)));
+      }
+      melSpectrogram.add(melFrame);
+    }
+
+    return melSpectrogram;
+  }
+
+  List<List<double>> _createMelFilterBank(int nFft, int nMels, int sampleRate) {
+    double hzToMel(double hz) => 2595.0 * log10(1.0 + hz / 700.0);
+    double melToHz(double mel) => 700.0 * (math.pow(10.0, mel / 2595.0) - 1.0);
+    final melMin = hzToMel(0.0);
+    final melMax = hzToMel(sampleRate / 2.0);
+    final melPoints = <double>[];
+
+    for (int i = 0; i <= nMels + 1; i++) {
+      final mel = melMin + (melMax - melMin) * i / (nMels + 1);
+      melPoints.add(melToHz(mel));
+    }
+    final binPoints =
+        melPoints.map((hz) => (nFft * hz / sampleRate).floor()).toList();
+    final filterBank = <List<double>>[];
+    for (int i = 1; i <= nMels; i++) {
+      final filter = List<double>.filled(nFft, 0.0);
+      final left = binPoints[i - 1];
+      final center = binPoints[i];
+      final right = binPoints[i + 1];
+
+      for (int j = left; j < center; j++) {
+        if (j < nFft) filter[j] = (j - left) / (center - left);
+      }
+      for (int j = center; j < right; j++) {
+        if (j < nFft) filter[j] = (right - j) / (right - center);
+      }
+
+      filterBank.add(filter);
+    }
+
+    return filterBank;
+  }
+
   List<List<double>> _preprocessForWav2Vec2(List<double> audioSamples) {
-    // Wav2Vec2 typically expects raw audio samples
-    // Normalize to zero mean, unit variance
     final mean = audioSamples.reduce((a, b) => a + b) / audioSamples.length;
     final variance =
         audioSamples
@@ -215,26 +337,21 @@ class TFLiteASREngine extends BaseInferenceEngine {
 
     final normalized =
         audioSamples.map((x) => (x - mean) / (std + 1e-8)).toList();
-
-    // Pad or truncate to model's expected length
-    final targetLength = _inputShape![1]; // Assuming [batch, time]
+    final targetLength = _inputShape![1];
     final processed = _padOrTruncateAudio(normalized, targetLength);
 
     return [processed];
   }
 
-  /// DeepSpeech-specific preprocessing
   List<List<double>> _preprocessForDeepSpeech(List<double> audioSamples) {
     // DeepSpeech typically uses MFCC features
     final mfccFeatures = _computeMFCC(audioSamples);
     return [mfccFeatures.expand((row) => row).toList()];
   }
 
-  /// Generic speech recognition preprocessing
   List<List<double>> _preprocessForSpeechRecognition(
     List<double> audioSamples,
   ) {
-    // Generic approach: compute log mel spectrogram
     final melSpectrogram = _computeMelSpectrogram(audioSamples);
 
     // Take log
@@ -325,44 +442,6 @@ class TFLiteASREngine extends BaseInferenceEngine {
     return logMel;
   }
 
-  /// Apply Hanning window
-  List<double> _applyHanningWindow(List<double> signal) {
-    final n = signal.length;
-    final windowed = <double>[];
-
-    for (int i = 0; i < n; i++) {
-      final window = 0.5 - 0.5 * math.cos(2 * math.pi * i / (n - 1));
-      windowed.add(signal[i] * window);
-    }
-
-    return windowed;
-  }
-
-  /// Compute FFT magnitude (simplified implementation)
-  List<double> _computeFFTMagnitude(List<double> signal) {
-    // This is a very simplified FFT implementation
-    // For production, use a proper FFT library like dart:fft
-
-    final n = signal.length;
-    final magnitude = <double>[];
-
-    for (int k = 0; k < n ~/ 2; k++) {
-      double real = 0.0;
-      double imag = 0.0;
-
-      for (int n_idx = 0; n_idx < n; n_idx++) {
-        final angle = -2 * math.pi * k * n_idx / n;
-        real += signal[n_idx] * math.cos(angle);
-        imag += signal[n_idx] * math.sin(angle);
-      }
-
-      magnitude.add(math.sqrt(real * real + imag * imag));
-    }
-
-    return magnitude;
-  }
-
-  /// Apply mel filter banks
   List<double> _applyMelFilterBanks(List<double> fftMagnitude) {
     // Simplified mel filter bank implementation
     final melFiltered = <double>[];

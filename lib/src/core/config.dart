@@ -66,28 +66,78 @@ class InferenceConfig {
   );
 }
 
+// lib/src/core/config.dart - Update your GenerationParams
 class GenerationParams {
   final int? maxTokens;
-  final List<String>? stopSequences;
-
-  // Gemma-specific parameters
   final double? temperature;
-  final int? randomSeed;
+  final double? topP;
   final int? topK;
+  final double? repeatPenalty;
+  final List<String>? stopSequences;
+  final int? seed;
+  final bool? stream;
 
   const GenerationParams({
     this.maxTokens,
-    this.stopSequences,
     this.temperature,
-    this.randomSeed,
+    this.topP,
     this.topK,
+    this.repeatPenalty,
+    this.stopSequences,
+    this.seed,
+    this.stream,
   });
 
-  factory GenerationParams.defaultParams() => const GenerationParams();
+  static GenerationParams creative() => const GenerationParams(
+    maxTokens: 2048,
+    temperature: 0.8,
+    topP: 0.9,
+    topK: 40,
+    repeatPenalty: 1.1,
+    stream: true,
+  );
 
-  factory GenerationParams.creative() =>
-      const GenerationParams(temperature: 1.0, topK: 40, randomSeed: 42);
+  static GenerationParams balanced() => const GenerationParams(
+    maxTokens: 1024,
+    temperature: 0.7,
+    topP: 0.85,
+    topK: 30,
+    repeatPenalty: 1.05,
+    stream: true,
+  );
 
-  factory GenerationParams.precise() =>
-      const GenerationParams(temperature: 0.1, topK: 1, randomSeed: 1);
+  static GenerationParams precise() => const GenerationParams(
+    maxTokens: 512,
+    temperature: 0.3,
+    topP: 0.7,
+    topK: 20,
+    repeatPenalty: 1.0,
+    stream: true,
+  );
+
+  static GenerationParams longForm() => const GenerationParams(
+    maxTokens: 4096,
+    temperature: 0.7,
+    topP: 0.9,
+    topK: 35,
+    repeatPenalty: 1.05,
+    stream: true,
+  );
+
+  static GenerationParams custom({
+    int maxTokens = 2048,
+    double temperature = 0.7,
+    double topP = 0.9,
+    int topK = 30,
+    double repeatPenalty = 1.05,
+    List<String>? stopSequences,
+  }) => GenerationParams(
+    maxTokens: maxTokens,
+    temperature: temperature,
+    topP: topP,
+    topK: topK,
+    repeatPenalty: repeatPenalty,
+    stopSequences: stopSequences,
+    stream: true,
+  );
 }
