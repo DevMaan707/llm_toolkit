@@ -11,8 +11,12 @@ import 'package:flutter/foundation.dart';
 import '../config.dart';
 import 'base_inference_engine.dart';
 import '../../exceptions/llm_toolkit_exceptions.dart';
+import 'dart:convert';
+import 'dart:io';
+import 'package:flutter/services.dart' show rootBundle;
+import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
 
-/// Production-ready TFLite ASR Engine with comprehensive error handling
 class TFLiteASREngine extends BaseInferenceEngine {
   // Core TFLite components
   Interpreter? _interpreter;
@@ -1471,7 +1475,7 @@ class TFLiteASREngine extends BaseInferenceEngine {
     return ASRModelType.whisper; // Default to Whisper
   }
 
-  /// Configure model-specific settings
+  //Configure model-specific settings
   void _configureModelSpecificSettings() {
     switch (_modelType) {
       case ASRModelType.whisper:
@@ -1509,7 +1513,7 @@ class TFLiteASREngine extends BaseInferenceEngine {
     }
   }
 
-  /// Validate model compatibility
+  // Validate model compatibility
   Future<void> _validateModelCompatibility() async {
     if (_inputShape == null || _outputShape == null) {
       throw InferenceException('Could not determine model input/output shapes');
@@ -1597,31 +1601,42 @@ class TFLiteASREngine extends BaseInferenceEngine {
   }
 
   /// Create default vocabulary for fallback
-  void _createDefaultVocabulary() {
-    _vocabulary = {};
+  Future<void> _createDefaultVocabulary() async {
+    const assetPath = 'assets/models/vocab.json';
+    const remoteUrl =
+        'https://huggingface.co/openai/whisper-tiny/resolve/main/vocab.json';
 
-    // Add special tokens
-    _vocabulary![0] = '<blank>';
-    _vocabulary![1] = '<pad>';
-    _vocabulary![2] = '<unk>';
-    _vocabulary![3] = '<s>';
-    _vocabulary![4] = '</s>';
-
-    // Add letters
-    for (int i = 0; i < 26; i++) {
-      _vocabulary![i + 5] = String.fromCharCode(97 + i); // a-z
+    String jsonStr;
+    try {
+      // 1. Try loading from bundled assets
+      jsonStr = await rootBundle.loadString(assetPath);
+    } catch (_) {
+      // 2. Fallback: download if asset not found
+      final response = await http.get(Uri.parse(remoteUrl));
+      if (response.statusCode != 200) {
+        throw Exception(
+          'Failed to download vocab.json: HTTP ${response.statusCode}',
+        );
+      }
+      jsonStr = response.body;
     }
 
-    // Add space and punctuation
-    _vocabulary![31] = ' ';
-    _vocabulary![32] = "'";
-    _vocabulary![33] = '.';
-    _vocabulary![34] = ',';
-    _vocabulary![35] = '!';
-    _vocabulary![36] = '?';
-    _vocabulary![37] = '-';
+    // 3. Parse the raw map
+    final rawMap = json.decode(jsonStr) as Map<String, dynamic>;
 
-    print('📚 Created default vocabulary with ${_vocabulary!.length} tokens');
+    // 4. Convert keys from String → int, and values to String
+    _vocabulary = rawMap.map((key, value) {
+      final intKey = int.tryParse(key);
+      if (intKey == null) {
+        throw FormatException('Invalid vocab key, expected integer: "$key"');
+      }
+      return MapEntry(intKey, value?.toString() ?? '');
+    });
+
+    // 5. Safe null check (!) or conditional access (?.)
+    final count =
+        _vocabulary!.length; // OK because we just assigned it non-null
+    print('📚 Loaded vocabulary: $count tokens');
   }
 
   // Implement required abstract methods
