@@ -1,44 +1,78 @@
 import 'package:flutter_gemma/core/model.dart';
 
-enum InferenceEngineType { gemma, llama }
+enum InferenceEngineType { llama, gemma, tflite, tfliteASR, whisper_gguf }
 
 class ModelDetector {
-  static ModelDetector? _instance;
-  static ModelDetector get instance => _instance ??= ModelDetector._();
-
-  ModelDetector._();
+  static final ModelDetector instance = ModelDetector._internal();
+  ModelDetector._internal();
 
   InferenceEngineType detectEngine(String modelPath) {
-    final lowerPath = modelPath.toLowerCase();
+    final fileName = modelPath.toLowerCase();
 
-    // GGUF/GGML files always use Llama engine
-    if (lowerPath.endsWith('.gguf') || lowerPath.endsWith('.ggml')) {
-      return InferenceEngineType.llama;
+    // Check if it's an ASR model first
+    if (isASRModel(fileName)) {
+      return InferenceEngineType.tfliteASR;
     }
 
-    // ALL TFLite files should ALWAYS use Gemma engine
-    if (lowerPath.endsWith('.tflite')) {
+    // For Gemma models - only use Gemma engine for Google/Gemini models
+    if (isGemmaModel(fileName) && isGoogleModel(fileName)) {
       return InferenceEngineType.gemma;
     }
 
-    // Default to Llama only for non-TFLite formats
-    return InferenceEngineType.llama;
+    // For all other TFLite models (including non-Google Gemma), use TFLite engine
+    if (fileName.endsWith('.tflite')) {
+      return InferenceEngineType.tflite;
+    }
+
+    // Default to Llama for GGUF files
+    if (fileName.endsWith('.gguf')) {
+      return InferenceEngineType.llama;
+    }
+
+    return InferenceEngineType.llama; // Default fallback
   }
 
-  ModelType? detectGemmaModelType(String modelPath) {
-    final lowerPath = modelPath.toLowerCase();
+  bool isASRModel(String fileName) {
+    final asrKeywords = [
+      'whisper',
+      'asr',
+      'speech',
+      'voice',
+      'audio',
+      'transcribe',
+      'stt', // speech-to-text
+    ];
 
-    if (lowerPath.contains('deepseek')) {
+    return asrKeywords.any((keyword) => fileName.contains(keyword));
+  }
+
+  bool isGemmaModel(String fileName) {
+    return fileName.contains('gemma');
+  }
+
+  bool isGoogleModel(String fileName) {
+    final googleIndicators = ['google', 'gemini', 'bard'];
+    return googleIndicators.any((indicator) => fileName.contains(indicator));
+  }
+
+  // Keep existing methods for Gemma compatibility
+  ModelType? detectGemmaModelType(String modelPath) {
+    final fileName = modelPath.toLowerCase();
+
+    if (fileName.contains('deepseek')) {
       return ModelType.deepSeek;
     }
+
+    // Default to gemmaIt for other Gemma models
     return ModelType.gemmaIt;
   }
 
   bool supportsMultimodal(String modelPath) {
-    final lowerPath = modelPath.toLowerCase();
+    final fileName = modelPath.toLowerCase();
 
-    return lowerPath.contains('gemma') &&
-        lowerPath.contains('nano') &&
-        lowerPath.endsWith('.tflite');
+    // Check for multimodal indicators
+    final multimodalKeywords = ['vision', 'multimodal', 'image', 'visual'];
+
+    return multimodalKeywords.any((keyword) => fileName.contains(keyword));
   }
 }

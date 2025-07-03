@@ -151,6 +151,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
                   _buildTab(Icons.star_rounded, 'Recommended'),
                   _buildTab(Icons.storage_rounded, 'Downloaded'),
                   _buildTab(Icons.article_rounded, 'RAG'),
+                  _buildTab(Icons.mic_rounded, 'ASR'),
                 ],
               ),
             ),
@@ -211,5 +212,5 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   }
 
   @override
-  Size get preferredSize => const Size.fromHeight(116);
+  Size get preferredSize => const Size.fromHeight(120);
 }

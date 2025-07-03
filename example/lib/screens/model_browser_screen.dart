@@ -5,9 +5,11 @@ import '../widgets/common/loading_overlay.dart';
 import '../widgets/tabs/search_tab.dart';
 import '../widgets/tabs/recommended_tab.dart';
 import '../widgets/tabs/downloaded_tab.dart';
-import '../widgets/tabs/rag_tab.dart'; // Add this import
+import '../widgets/tabs/rag_tab.dart';
 import '../widgets/debug/debug_panel.dart';
 import '../widgets/status/model_status_card.dart';
+import '../services/asr_service_wrapper.dart';
+import '../widgets/tabs/asr_tab.dart';
 
 class ModelBrowserScreen extends StatefulWidget {
   @override
@@ -19,14 +21,11 @@ class _ModelBrowserScreenState extends State<ModelBrowserScreen>
   late TabController _tabController;
   final LLMService _llmService = LLMService();
   bool _showDebugPanel = false;
-
+  final ASRServiceWrapper _asrService = ASRServiceWrapper();
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(
-      length: 4,
-      vsync: this,
-    ); // Change from 3 to 4
+    _tabController = TabController(length: 5, vsync: this);
     _llmService.initialize();
   }
 
@@ -34,6 +33,7 @@ class _ModelBrowserScreenState extends State<ModelBrowserScreen>
   void dispose() {
     _tabController.dispose();
     _llmService.dispose();
+    _asrService.dispose();
     super.dispose();
   }
 
@@ -44,7 +44,7 @@ class _ModelBrowserScreenState extends State<ModelBrowserScreen>
         child: Column(
           children: [
             CustomAppBar(
-              title: 'LLM Toolkit Pro',
+              title: 'LLM Toolkit',
               onDebugToggle: () {
                 setState(() {
                   _showDebugPanel = !_showDebugPanel;
@@ -66,37 +66,13 @@ class _ModelBrowserScreenState extends State<ModelBrowserScreen>
                   RecommendedTab(llmService: _llmService),
                   DownloadedTab(llmService: _llmService),
                   RagTab(llmService: _llmService),
+                  AsrTab(llmService: _llmService, asrService: _asrService),
                 ],
               ),
             ),
           ],
         ),
       ),
-
-      //floatingActionButton: _buildRagFab(),
     );
   }
-
-  // Widget _buildRagFab() {
-  //   return StreamBuilder<bool>(
-  //     // You might want to listen to RAG service state here
-  //     builder: (context, snapshot) {
-  //       // Only show if we're on RAG tab and have initialized RAG
-  //       if (_tabController.index == 3) {
-  //         return FloatingActionButton.extended(
-  //           onPressed: () {
-  //             // Navigate to RAG chat if initialized
-  //             // You'll need to pass the RAG service instance here
-  //           },
-  //           backgroundColor: Colors.purple.shade600,
-  //           foregroundColor: Colors.white,
-  //           icon: const Icon(Icons.auto_awesome_rounded),
-  //           label: const Text('RAG Chat'),
-  //           elevation: 8,
-  //         );
-  //       }
-  //       return const SizedBox.shrink();
-  //     },
-  //   );
-  // }
 }

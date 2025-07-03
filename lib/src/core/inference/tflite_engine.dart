@@ -1,157 +1,95 @@
-import 'package:tflite_flutter/tflite_flutter.dart';
-import 'dart:typed_data';
-import 'dart:io';
-
-import '../../../llm_toolkit.dart';
+import 'package:flutter_gemma/core/model.dart';
+import 'package:flutter_gemma/flutter_gemma.dart';
+import 'package:flutter_gemma/pigeon.g.dart';
+import '../../exceptions/llm_toolkit_exceptions.dart';
+import '../config.dart';
 import 'base_inference_engine.dart';
 
 class TFLiteInferenceEngine extends BaseInferenceEngine {
-  Interpreter? _interpreter;
+  // Use flutter_gemma's TFLite backend for non-Google models
+  InferenceModel? _inferenceModel;
   bool _isModelLoaded = false;
   String? _currentModelPath;
 
   @override
   Future<void> loadModel(String modelPath, InferenceConfig config) async {
-    if (_interpreter != null) {
+    if (_inferenceModel != null) {
       await unloadModel();
     }
 
     try {
-      // Load from file path
-      _interpreter = await Interpreter.fromFile(File(modelPath));
+      // Use flutter_gemma's ModelFileManager for TFLite models
+      final modelManager = FlutterGemmaPlugin.instance.modelManager;
 
-      // Get model info
-      final inputTensors = _interpreter!.getInputTensors();
-      final outputTensors = _interpreter!.getOutputTensors();
+      print('Installing TFLite model at path: $modelPath');
+      await modelManager.setModelPath(modelPath);
 
-      print('TFLite Model loaded successfully');
-      print('Input tensors: ${inputTensors.length}');
-      print('Output tensors: ${outputTensors.length}');
-
-      for (int i = 0; i < inputTensors.length; i++) {
-        print('Input $i shape: ${inputTensors[i].shape}');
-        print('Input $i type: ${inputTensors[i].type}');
+      // Verify installation
+      final isInstalled = await modelManager.isModelInstalled;
+      if (!isInstalled) {
+        throw InferenceException('TFLite model not properly installed');
       }
+
+      // Create inference model with CPU backend for non-Google models
+      _inferenceModel = await FlutterGemmaPlugin.instance.createModel(
+        modelType: ModelType.gemmaIt, // Default type for TFLite models
+        preferredBackend: PreferredBackend.cpu, // Use CPU for non-Google models
+        maxTokens: config.maxTokens ?? 1024,
+        supportImage: false, // Non-Google models typically don't support images
+        maxNumImages: 1,
+      );
 
       _isModelLoaded = true;
       _currentModelPath = modelPath;
+
+      print('✅ TFLite model loaded successfully');
     } catch (e) {
+      print('❌ Failed to load TFLite model: $e');
       throw InferenceException('Failed to load TFLite model: $e');
     }
   }
 
-  // For Whisper ASR models
-  Future<String> transcribeAudio(Uint8List audioData) async {
-    if (!_isModelLoaded || _interpreter == null) {
-      throw InferenceException('TFLite model not loaded');
-    }
-
-    try {
-      // Prepare input based on Whisper model requirements
-      final inputShape = _interpreter!.getInputTensor(0).shape;
-      final processedInput = _preprocessAudioForWhisper(audioData, inputShape);
-
-      // Prepare output
-      final outputShape = _interpreter!.getOutputTensor(0).shape;
-      final output = List.filled(
-        outputShape.reduce((a, b) => a * b),
-        0.0,
-      ).reshape(outputShape);
-
-      // Run inference
-      _interpreter!.run(processedInput, output);
-
-      // Post-process output to text
-      return _postprocessWhisperOutput(output);
-    } catch (e) {
-      throw InferenceException('Failed to transcribe audio: $e');
-    }
-  }
-
-  // Generic inference for any TFLite model
-  Future<List<List<double>>> runInference(List<dynamic> inputs) async {
-    if (!_isModelLoaded || _interpreter == null) {
-      throw InferenceException('TFLite model not loaded');
-    }
-
-    try {
-      final outputs = <int, Object>{};
-      final outputTensors = _interpreter!.getOutputTensors();
-
-      // Prepare outputs
-      for (int i = 0; i < outputTensors.length; i++) {
-        final shape = outputTensors[i].shape;
-        final size = shape.reduce((a, b) => a * b);
-        outputs[i] = List.filled(size, 0.0).reshape(shape);
-      }
-
-      if (inputs.length == 1) {
-        final output = outputs[0];
-        if (output == null) {
-          throw InferenceException('Output tensor is null');
-        }
-        _interpreter!.run(inputs[0], output);
-      } else {
-        _interpreter!.runForMultipleInputs(inputs.cast<Object>(), outputs);
-      }
-      return outputs.values
-          .map((output) => (output as List).cast<double>())
-          .toList();
-    } catch (e) {
-      throw InferenceException('Failed to run TFLite inference: $e');
-    }
-  }
-
-  List<double> _preprocessAudioForWhisper(
-    Uint8List audioData,
-    List<int> inputShape,
-  ) {
-    // Implement Whisper-specific audio preprocessing
-    // This would include:
-    // 1. Convert audio to mel spectrogram
-    // 2. Normalize values
-    // 3. Reshape to match input requirements
-
-    // Placeholder implementation
-    final expectedSize = inputShape.reduce((a, b) => a * b);
-    return List.filled(expectedSize, 0.0);
-  }
-
-  String _postprocessWhisperOutput(List output) {
-    // Implement Whisper-specific output processing
-    // This would include:
-    // 1. Convert logits to tokens
-    // 2. Decode tokens to text
-    // 3. Apply any post-processing rules
-
-    // Placeholder implementation
-    return "Transcribed text placeholder";
-  }
-
   @override
   Stream<String> generateText(String prompt, GenerationParams params) async* {
-    // For text generation models, implement streaming if supported
-    final result = await runInference([prompt]);
-    yield result.toString();
+    if (!_isModelLoaded || _inferenceModel == null) {
+      throw InferenceException('TFLite model not loaded');
+    }
+
+    try {
+      final session = await _inferenceModel!.createSession(
+        temperature: params.temperature ?? 0.8,
+        topK: params.topK ?? 1,
+      );
+
+      await session.addQueryChunk(Message.text(text: prompt, isUser: true));
+
+      await for (final chunk in session.getResponseAsync()) {
+        yield chunk;
+      }
+
+      await session.close();
+    } catch (e) {
+      throw InferenceException('Failed to generate text with TFLite: $e');
+    }
   }
 
   @override
   Future<List<double>> generateEmbedding(String text) async {
-    // For embedding models
-    final result = await runInference([text]);
-    return result.first;
+    throw UnimplementedError('Embeddings not supported in TFLite engine');
   }
 
   @override
   Future<void> unloadModel() async {
-    if (_interpreter != null) {
-      _interpreter!.close();
-      _interpreter = null;
+    if (_inferenceModel != null) {
+      await _inferenceModel!.close();
+      _inferenceModel = null;
+      _isModelLoaded = false;
+      _currentModelPath = null;
     }
-    _isModelLoaded = false;
-    _currentModelPath = null;
   }
 
   @override
   bool get isModelLoaded => _isModelLoaded;
+
+  String? get currentModelPath => _currentModelPath;
 }

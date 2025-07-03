@@ -15,6 +15,8 @@ dependencies:
   http: ^1.1.0
   path_provider: ^2.1.1
   #tflite_text_classification: ^0.0.2
+  record: ^6.0.0
+  fftea: ^1.0.0
 
   objectbox: ^4.3.0
   objectbox_flutter_libs: ^4.3.0

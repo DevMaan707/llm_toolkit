@@ -1,4 +1,3 @@
-// lib/llm_toolkit.dart
 library llm_toolkit;
 
 export 'src/core/base_provider.dart';
@@ -8,13 +7,13 @@ export 'src/core/search_query.dart';
 export 'src/core/model_detector.dart';
 export 'src/exceptions/llm_toolkit_exceptions.dart';
 import 'package:llm_toolkit/src/core/inference/llama_engine.dart';
-// Export flutter_gemma types for convenience
 export 'package:flutter_gemma/flutter_gemma.dart';
 
 import 'src/core/base_provider.dart';
 import 'src/core/inference/inference_manager.dart';
-
 import 'src/core/inference/gemma_engine.dart';
+import 'src/core/inference/tflite_engine.dart';
+import 'src/core/inference/tflite_asr_engine.dart';
 import 'src/core/model_info.dart';
 import 'src/core/config.dart';
 import 'src/core/providers/huggingface/hf_provider.dart';
@@ -37,18 +36,19 @@ class LLMToolkit {
     // Register providers
     _providers['huggingface'] = HuggingFaceProvider(apiKey: huggingFaceApiKey);
 
-    // REMOVED: Custom ModelFileManager initialization
-    // flutter_gemma handles model file management internally
-
-    // Register both inference engines
+    // Register all inference engines
     _inferenceManager.registerEngine('llama', LlamaInferenceEngine());
     _inferenceManager.registerEngine('gemma', GemmaInferenceEngine());
+    _inferenceManager.registerEngine('tflite', TFLiteInferenceEngine());
+    _inferenceManager.registerEngine('tfliteASR', TFLiteASREngine());
 
     if (defaultConfig != null) {
       _defaultConfig = defaultConfig;
     }
 
-    print('🚀 LLM Toolkit initialized with Gemma and Llama engines');
+    print(
+      '🚀 LLM Toolkit initialized with Llama, Gemma, TFLite, and ASR engines',
+    );
   }
 
   // Rest of your methods remain the same...
@@ -153,6 +153,10 @@ class LLMToolkit {
 
   Future<List<double>> generateEmbedding(String text) async {
     return await _inferenceManager.generateEmbedding(text);
+  }
+
+  Future<String> transcribeAudio(List<int> audioBytes) async {
+    return await _inferenceManager.transcribeAudio(audioBytes);
   }
 
   InferenceEngineType? get activeEngine => _inferenceManager.activeEngineType;
