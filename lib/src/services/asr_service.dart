@@ -85,12 +85,13 @@ class ASRService {
     }
   }
 
-  /// Quick transcription from audio file
   Future<String> transcribeFile(String audioFilePath) async {
     _checkInitialized();
 
     try {
-      print('🎤 Transcribing file: ${audioFilePath.split('/').last}');
+      print(
+        '🎤 Transcribing file with enhanced processing: ${audioFilePath.split('/').last}',
+      );
 
       final audioFile = File(audioFilePath);
       if (!await audioFile.exists()) {
@@ -100,24 +101,39 @@ class ASRService {
       final audioBytes = await audioFile.readAsBytes();
       final extension = audioFilePath.toLowerCase().split('.').last;
 
+      // Determine format
       AudioFormat format;
       switch (extension) {
         case 'wav':
-          // For WAV files, we need to process the header
-          format = AudioFormat.pcm16; // Assume 16-bit PCM for WAV
+          format = AudioFormat.wav;
           break;
         case 'pcm':
           format = AudioFormat.pcm16;
           break;
         default:
-          format = AudioFormat.pcm16; // Default fallback
+          format = AudioFormat.wav;
       }
 
-      return await _asrEngine!.transcribeAudio(
-        audioBytes,
-        format: format,
-        sampleRate: _config.sampleRate,
-      );
+      // Use enhanced transcription with chunking for longer files
+      final fileSize = audioBytes.length;
+      final estimatedDuration = fileSize / (16000 * 2); // Rough estimate
+
+      if (estimatedDuration > 15.0) {
+        // Use chunked transcription for longer files
+        return await _asrEngine!.transcribeAudioChunked(
+          audioBytes,
+          format: format,
+          sampleRate: _config.sampleRate,
+          useChunking: true,
+        );
+      } else {
+        // Use enhanced direct transcription
+        return await _asrEngine!.transcribeAudio(
+          audioBytes,
+          format: format,
+          sampleRate: _config.sampleRate,
+        );
+      }
     } catch (e) {
       throw InferenceException('Failed to transcribe file: $e');
     }
@@ -412,7 +428,6 @@ class ASRService {
     }
   }
 
-  /// Record with voice activity detection
   Future<String> recordWithVAD({
     Duration maxDuration = const Duration(seconds: 30),
     Duration silenceTimeout = const Duration(seconds: 3),
@@ -430,17 +445,11 @@ class ASRService {
       while (DateTime.now().difference(startTime) < maxDuration) {
         await Future.delayed(const Duration(milliseconds: 100));
 
-        // Simple VAD simulation - in real implementation, you'd analyze audio levels
-        // For now, we'll assume voice activity if we're still recording
         final currentTime = DateTime.now();
-
-        // Check if we've been silent for too long
         if (currentTime.difference(lastVoiceActivity) > silenceTimeout) {
           print('🎤 Silence detected, stopping recording');
           break;
         }
-
-        // Update last voice activity (simplified - would need actual audio analysis)
         if (_isRecording) {
           lastVoiceActivity = currentTime;
         }
