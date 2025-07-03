@@ -99,7 +99,7 @@ class TFLiteASREngine extends BaseInferenceEngine {
       await _initializeAudioProcessing();
 
       // Load vocabulary if available
-      await _loadVocabulary(modelPath);
+      await _loadVocabulary();
 
       // Validate model compatibility
       await _validateModelCompatibility();
@@ -217,7 +217,7 @@ class TFLiteASREngine extends BaseInferenceEngine {
 
       // Step 1: Convert audio data to float samples
       preprocessStopwatch.start();
-      final audioSamples = await _convertAudioToSamples(audioData, format);
+      final audioSamples = await convertAudioToSamples(audioData, format);
       print('   Converted to ${audioSamples.length} samples');
 
       if (audioSamples.isEmpty) {
@@ -551,8 +551,7 @@ class TFLiteASREngine extends BaseInferenceEngine {
     return resampled;
   }
 
-  /// Convert audio data to float samples with comprehensive format support
-  Future<List<double>> _convertAudioToSamples(
+  Future<List<double>> convertAudioToSamples(
     Uint8List audioData,
     AudioFormat format,
   ) async {
@@ -1246,67 +1245,124 @@ class TFLiteASREngine extends BaseInferenceEngine {
     }
   }
 
-  /// Start streaming transcription with optimized chunking
   Stream<String> startStreamingTranscription() async* {
     if (!_isModelLoaded || _interpreter == null) {
       throw InferenceException('ASR model not loaded');
     }
 
+    _isStreamingMode = true;
+    _isRecording = true;
+
     try {
-      await startRecording(streamingMode: true);
+      // Check microphone permission
+      final hasPermission = await _audioRecorder.hasPermission();
+      if (!hasPermission) {
+        throw InferenceException('Microphone permission not granted');
+      }
+
+      print('🎤 Starting optimized streaming transcription...');
 
       final tempDir = await getTemporaryDirectory();
+      const chunkDuration = Duration(
+        milliseconds: 3000,
+      ); // 3 second chunks for better accuracy
 
-      while (_isRecording) {
-        await Future.delayed(const Duration(milliseconds: 500));
+      while (_isStreamingMode && _isRecording) {
+        final chunkPath =
+            '${tempDir.path}/stream_${DateTime.now().millisecondsSinceEpoch}.wav';
 
-        if (_isRecording) {
-          try {
-            final currentPath = await _audioRecorder.stop();
-            if (currentPath != null) {
-              final audioFile = File(currentPath);
-              if (await audioFile.exists()) {
-                final audioBytes = await audioFile.readAsBytes();
+        try {
+          // Start recording chunk
+          await _audioRecorder.start(
+            const RecordConfig(
+              encoder: AudioEncoder.wav,
+              sampleRate: SAMPLE_RATE,
+              bitRate: 256000,
+              numChannels: 1,
+            ),
+            path: chunkPath,
+          );
 
-                final partialTranscription = await transcribeAudio(
-                  audioBytes,
-                  format: AudioFormat.wav,
-                );
+          // Wait for chunk duration
+          await Future.delayed(chunkDuration);
 
-                if (partialTranscription.trim().isNotEmpty &&
-                    partialTranscription != 'No speech detected' &&
-                    !partialTranscription.startsWith('Error')) {
-                  yield partialTranscription;
+          if (!_isStreamingMode) break;
+
+          // Stop and process chunk
+          final recordedPath = await _audioRecorder.stop();
+
+          if (recordedPath != null && _isStreamingMode) {
+            final audioFile = File(recordedPath);
+
+            if (await audioFile.exists()) {
+              final audioBytes = await audioFile.readAsBytes();
+
+              // Process chunk if it has sufficient data
+              if (audioBytes.length > 16000) {
+                // At least 16KB for 3 seconds
+                try {
+                  final transcription = await transcribeAudio(
+                    audioBytes,
+                    format: AudioFormat.wav,
+                  );
+
+                  // Emit if transcription is meaningful
+                  if (_isValidTranscription(transcription)) {
+                    print('🎤 Streaming result: "$transcription"');
+                    yield transcription;
+                  }
+                } catch (e) {
+                  print('❌ Chunk processing error: $e');
+                  // Continue streaming despite processing errors
                 }
+              }
 
+              // Clean up
+              try {
                 await audioFile.delete();
+              } catch (e) {
+                print('Warning: Failed to delete chunk file: $e');
               }
             }
-
-            if (_isStreamingMode) {
-              final newPath =
-                  '${tempDir.path}/temp_audio_${DateTime.now().millisecondsSinceEpoch}.wav';
-              await _audioRecorder.start(
-                const RecordConfig(
-                  encoder: AudioEncoder.wav,
-                  sampleRate: SAMPLE_RATE,
-                  bitRate: 256000,
-                  numChannels: 1,
-                ),
-                path: newPath,
-              );
-            }
-          } catch (e) {
-            print('Streaming chunk error: $e');
-            continue;
           }
+
+          // Brief pause before next chunk
+          if (_isStreamingMode) {
+            await Future.delayed(const Duration(milliseconds: 200));
+          }
+        } catch (e) {
+          print('❌ Streaming chunk error: $e');
+          await Future.delayed(const Duration(milliseconds: 1000));
+          continue;
         }
       }
     } catch (e) {
-      _isRecording = false;
       _isStreamingMode = false;
+      _isRecording = false;
       throw InferenceException('Streaming transcription failed: $e');
+    } finally {
+      _isStreamingMode = false;
+      _isRecording = false;
+      print('🎤 Streaming transcription ended');
     }
+  }
+
+  bool _isValidTranscription(String transcription) {
+    if (transcription.trim().isEmpty) return false;
+    if (transcription.trim() == "...") return false;
+    if (transcription.toLowerCase() == "no speech detected") return false;
+    if (transcription.toLowerCase().contains("error")) return false;
+    if (transcription.trim().length < 2) return false;
+
+    // Check for common meaningless outputs
+    final meaninglessPatterns = ["...", "   ", "null", "undefined", "unknown"];
+
+    final lowerTranscription = transcription.toLowerCase().trim();
+    for (final pattern in meaninglessPatterns) {
+      if (lowerTranscription == pattern) return false;
+    }
+
+    return true;
   }
 
   /// Stop streaming transcription
@@ -1540,106 +1596,46 @@ class TFLiteASREngine extends BaseInferenceEngine {
     print('✅ Model compatibility validated');
   }
 
-  /// Load vocabulary from file with multiple format support
-  Future<void> _loadVocabulary(String modelPath) async {
-    final vocabPaths = [
-      modelPath.replaceAll('.tflite', '_vocab.json'),
-      modelPath.replaceAll('.tflite', '_tokenizer.json'),
-      modelPath.replaceAll('.tflite', '.vocab'),
-      '${modelPath.substring(0, modelPath.lastIndexOf('/'))}/vocab.json',
-      '${modelPath.substring(0, modelPath.lastIndexOf('/'))}/tokenizer.json',
-    ];
-
-    for (final vocabPath in vocabPaths) {
-      final vocabFile = File(vocabPath);
-      if (await vocabFile.exists()) {
-        try {
-          final vocabContent = await vocabFile.readAsString();
-
-          if (vocabPath.endsWith('.json')) {
-            final vocabData = json.decode(vocabContent);
-
-            if (vocabData is Map<String, dynamic>) {
-              _vocabulary = {};
-              vocabData.forEach((k, v) {
-                final index = int.tryParse(k);
-                if (index != null && v is String) {
-                  _vocabulary![index] = v;
-                }
-              });
-            } else if (vocabData is List) {
-              _vocabulary = {};
-              for (int i = 0; i < vocabData.length; i++) {
-                if (vocabData[i] is String) {
-                  _vocabulary![i] = vocabData[i];
-                }
-              }
-            }
-          } else {
-            final lines = vocabContent.split('\n');
-            _vocabulary = {};
-            for (int i = 0; i < lines.length; i++) {
-              final line = lines[i].trim();
-              if (line.isNotEmpty) {
-                _vocabulary![i] = line;
-              }
-            }
-          }
-
-          print(
-            '📚 Loaded vocabulary with ${_vocabulary!.length} tokens from $vocabPath',
-          );
-          return;
-        } catch (e) {
-          print('⚠️ Failed to load vocabulary from $vocabPath: $e');
-          continue;
-        }
-      }
-    }
-
-    _createDefaultVocabulary();
+  Future<List<double>> preprocessAudioSamples(List<double> audioSamples) async {
+    return await compute(_preprocessAudioForWhisperIsolate, audioSamples);
   }
 
-  /// Create default vocabulary for fallback
-  Future<void> _createDefaultVocabulary() async {
+  Future<String> inferChunk(List<double> melFrames) async {
+    final output = await _runInference(melFrames);
+    return await _decodeWhisperOutput(output);
+  }
+
+  Future<void> _loadVocabulary() async {
     const assetPath = 'assets/models/vocab.json';
     const remoteUrl =
         'https://huggingface.co/openai/whisper-tiny/resolve/main/vocab.json';
 
     String jsonStr;
     try {
-      // 1. Try loading from bundled assets
       jsonStr = await rootBundle.loadString(assetPath);
     } catch (_) {
-      // 2. Fallback: download if asset not found
-      final response = await http.get(Uri.parse(remoteUrl));
-      if (response.statusCode != 200) {
+      final resp = await http.get(Uri.parse(remoteUrl));
+      if (resp.statusCode != 200) {
         throw Exception(
-          'Failed to download vocab.json: HTTP ${response.statusCode}',
+          'Failed to download vocab.json (HTTP ${resp.statusCode})',
         );
       }
-      jsonStr = response.body;
+      jsonStr = resp.body;
     }
+    final Map<String, dynamic> rawMap =
+        json.decode(jsonStr) as Map<String, dynamic>;
 
-    // 3. Parse the raw map
-    final rawMap = json.decode(jsonStr) as Map<String, dynamic>;
-
-    // 4. Convert keys from String → int, and values to String
-    _vocabulary = rawMap.map((key, value) {
-      final intKey = int.tryParse(key);
-      if (intKey == null) {
-        throw FormatException('Invalid vocab key, expected integer: "$key"');
-      }
-      return MapEntry(intKey, value?.toString() ?? '');
+    final vocab = <int, String>{};
+    rawMap.forEach((token, idDynamic) {
+      final id =
+          (idDynamic is int) ? idDynamic : int.parse(idDynamic.toString());
+      vocab[id] = token;
     });
-
-    // 5. Safe null check (!) or conditional access (?.)
-    final count =
-        _vocabulary!.length; // OK because we just assigned it non-null
+    _vocabulary = vocab;
+    final count = _vocabulary!.length;
     print('📚 Loaded vocabulary: $count tokens');
   }
 
-  // Implement required abstract methods
   @override
   Stream<String> generateText(String prompt, GenerationParams params) async* {
     throw UnimplementedError('ASR models do not support text generation');

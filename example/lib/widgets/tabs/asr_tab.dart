@@ -3,6 +3,7 @@ import 'package:file_picker/file_picker.dart';
 import '../../services/llm_service.dart';
 import '../../services/asr_service_wrapper.dart';
 import '../common/empty_state.dart';
+import 'dart:async';
 
 class AsrTab extends StatefulWidget {
   final LLMService llmService;
@@ -17,7 +18,13 @@ class AsrTab extends StatefulWidget {
 
 class _AsrTabState extends State<AsrTab> {
   String? _selectedModelPath;
-  bool _isStreamingMode = false;
+  StreamSubscription<String>? _streamingSubscription;
+
+  @override
+  void dispose() {
+    _streamingSubscription?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -337,7 +344,9 @@ class _AsrTabState extends State<AsrTab> {
               ],
             ),
             const SizedBox(height: 12),
-            if (widget.asrService.isRecording || widget.asrService.isProcessing)
+            if (widget.asrService.isRecording ||
+                widget.asrService.isProcessing ||
+                widget.asrService.isStreaming)
               _buildStatusIndicator(),
           ],
         ),
@@ -347,7 +356,10 @@ class _AsrTabState extends State<AsrTab> {
 
   Widget _buildRecordButton() {
     return ElevatedButton.icon(
-      onPressed: widget.asrService.isProcessing ? null : _handleRecording,
+      onPressed:
+          widget.asrService.isProcessing || widget.asrService.isStreaming
+              ? null
+              : _handleRecording,
       icon: Icon(
         widget.asrService.isRecording ? Icons.stop_rounded : Icons.mic_rounded,
         size: 16,
@@ -371,7 +383,9 @@ class _AsrTabState extends State<AsrTab> {
   Widget _buildImportButton() {
     return ElevatedButton.icon(
       onPressed:
-          widget.asrService.isProcessing || widget.asrService.isRecording
+          widget.asrService.isProcessing ||
+                  widget.asrService.isRecording ||
+                  widget.asrService.isStreaming
               ? null
               : _importAudioFile,
       icon: const Icon(Icons.file_upload_rounded, size: 16),
@@ -388,18 +402,24 @@ class _AsrTabState extends State<AsrTab> {
   Widget _buildLiveButton() {
     return ElevatedButton.icon(
       onPressed:
-          widget.asrService.isProcessing ? null : _handleLiveTranscription,
+          widget.asrService.isProcessing || widget.asrService.isRecording
+              ? null
+              : _handleLiveTranscription,
       icon: Icon(
-        _isStreamingMode ? Icons.stop_rounded : Icons.radio_rounded,
+        widget.asrService.isStreaming
+            ? Icons.stop_rounded
+            : Icons.radio_rounded,
         size: 16,
       ),
       label: Text(
-        _isStreamingMode ? 'Stop Live' : 'Live',
+        widget.asrService.isStreaming ? 'Stop Live' : 'Live',
         style: const TextStyle(fontSize: 11),
       ),
       style: ElevatedButton.styleFrom(
         backgroundColor:
-            _isStreamingMode ? Colors.red.shade600 : Colors.purple.shade600,
+            widget.asrService.isStreaming
+                ? Colors.red.shade600
+                : Colors.purple.shade600,
         foregroundColor: Colors.white,
         padding: const EdgeInsets.symmetric(vertical: 8),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
@@ -414,9 +434,11 @@ class _AsrTabState extends State<AsrTab> {
     if (widget.asrService.isProcessing) {
       statusText = 'Processing audio...';
       statusColor = Colors.orange.shade600;
+    } else if (widget.asrService.isStreaming) {
+      statusText = 'Live transcription active';
+      statusColor = Colors.purple.shade600;
     } else if (widget.asrService.isRecording) {
-      statusText =
-          _isStreamingMode ? 'Live transcription active' : 'Recording audio...';
+      statusText = 'Recording audio...';
       statusColor = Colors.red.shade600;
     } else {
       statusText = 'Ready';
@@ -432,7 +454,9 @@ class _AsrTabState extends State<AsrTab> {
       ),
       child: Row(
         children: [
-          if (widget.asrService.isProcessing || widget.asrService.isRecording)
+          if (widget.asrService.isProcessing ||
+              widget.asrService.isRecording ||
+              widget.asrService.isStreaming)
             SizedBox(
               width: 12,
               height: 12,
@@ -618,7 +642,6 @@ class _AsrTabState extends State<AsrTab> {
       if (widget.asrService.isRecording) {
         await widget.asrService.stopRecording();
       } else {
-        // Test microphone access first
         final hasAccess = await widget.asrService.testMicrophoneAccess();
         if (!hasAccess) {
           if (mounted) {
@@ -705,11 +728,13 @@ class _AsrTabState extends State<AsrTab> {
 
   Future<void> _handleLiveTranscription() async {
     try {
-      if (_isStreamingMode) {
+      if (widget.asrService.isStreaming) {
+        // Stop streaming
+        await _streamingSubscription?.cancel();
+        _streamingSubscription = null;
         await widget.asrService.stopStreamingTranscription();
-        setState(() => _isStreamingMode = false);
       } else {
-        // Test microphone access first
+        // Start streaming
         final hasAccess = await widget.asrService.testMicrophoneAccess();
         if (!hasAccess) {
           if (mounted) {
@@ -729,17 +754,36 @@ class _AsrTabState extends State<AsrTab> {
           return;
         }
 
-        setState(() => _isStreamingMode = true);
-
-        await for (final chunk
-            in widget.asrService.startStreamingTranscription()) {
-          // The transcription is automatically updated in the service
-          // We just need to handle any errors that might occur
-          if (!_isStreamingMode) break;
-        }
+        // Start the streaming subscription
+        _streamingSubscription = widget.asrService
+            .startStreamingTranscription()
+            .listen(
+              (chunk) {
+                // The transcription result is already updated in the service
+                // Just show a brief notification for each chunk if needed
+                print('Received chunk: $chunk');
+              },
+              onError: (error) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Streaming error: $error'),
+                      backgroundColor: Colors.red.shade600,
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                    ),
+                  );
+                }
+              },
+              onDone: () {
+                print('Streaming completed');
+                _streamingSubscription = null;
+              },
+            );
       }
     } catch (e) {
-      setState(() => _isStreamingMode = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -756,10 +800,12 @@ class _AsrTabState extends State<AsrTab> {
   }
 
   void _resetASR() {
+    // Cancel any ongoing operations
+    _streamingSubscription?.cancel();
+    _streamingSubscription = null;
+
     setState(() {
       _selectedModelPath = null;
-      _isStreamingMode = false;
     });
-    // Add actual reset logic if needed
   }
 }

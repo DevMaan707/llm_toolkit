@@ -57,6 +57,34 @@ class ASRService {
     }
   }
 
+  Future<String> processAudioChunk(Uint8List audioBytes) async {
+    _checkInitialized();
+
+    try {
+      if (_asrEngine == null) {
+        throw InferenceException('ASR engine not available');
+      }
+
+      // Convert audio bytes to samples - let the engine handle this
+      final audioSamples = await _asrEngine!.convertAudioToSamples(
+        audioBytes,
+        AudioFormat.wav,
+      );
+
+      if (audioSamples.isEmpty) {
+        return '';
+      }
+
+      // Let the engine preprocess to mel frames - this should be exposed
+      final melFrames = await _asrEngine!.preprocessAudioSamples(audioSamples);
+
+      // Use inferChunk for fast processing
+      return await _asrEngine!.inferChunk(melFrames);
+    } catch (e) {
+      throw InferenceException('Failed to process audio chunk: $e');
+    }
+  }
+
   /// Quick transcription from audio file
   Future<String> transcribeFile(String audioFilePath) async {
     _checkInitialized();
@@ -208,34 +236,161 @@ class ASRService {
     }
   }
 
-  /// Start streaming transcription (real-time)
-  Stream<String> startStreamingTranscription() {
+  Stream<String> startStreamingTranscription() async* {
     _checkInitialized();
 
-    if (_transcriptionController != null) {
-      _transcriptionController!.close();
+    if (_transcriptionController != null &&
+        !_transcriptionController!.isClosed) {
+      await _transcriptionController!.close();
     }
 
     _transcriptionController = StreamController<String>.broadcast();
+    _isStreamingMode = true;
 
-    // Start recording in streaming mode
-    startRecording(streamingMode: true).catchError((error) {
-      _transcriptionController?.addError(error);
-    });
+    try {
+      // Check microphone permission
+      final hasPermission = await _audioRecorder.hasPermission();
+      if (!hasPermission) {
+        throw InferenceException('Microphone permission not granted');
+      }
 
-    return _transcriptionController!.stream;
-  }
+      print('🎤 Starting continuous streaming transcription...');
 
-  /// Stop streaming transcription
-  Future<void> stopStreamingTranscription() async {
-    _stopStreamingTranscription();
+      // Start the continuous streaming process
+      _startContinuousStreaming();
 
-    if (_isRecording) {
-      await stopRecording();
+      // Yield chunks from the controller
+      await for (final chunk in _transcriptionController!.stream) {
+        if (!_isStreamingMode) break;
+        yield chunk;
+      }
+    } catch (e) {
+      _isStreamingMode = false;
+      _transcriptionController?.close();
+      throw InferenceException('Failed to start streaming transcription: $e');
     }
   }
 
-  /// Record for a specific duration and transcribe
+  /// Continuous streaming implementation with proper chunk processing
+  Future<void> _startContinuousStreaming() async {
+    const chunkDuration = Duration(milliseconds: 2000); // 2 second chunks
+    const overlapDuration = Duration(milliseconds: 500); // 0.5 second overlap
+
+    try {
+      final tempDir = await getTemporaryDirectory();
+
+      while (_isStreamingMode) {
+        final recordingPath =
+            '${tempDir.path}/stream_chunk_${DateTime.now().millisecondsSinceEpoch}.wav';
+
+        try {
+          // Start recording this chunk
+          await _audioRecorder.start(
+            RecordConfig(
+              encoder: AudioEncoder.wav,
+              sampleRate: _config.sampleRate,
+              bitRate: _config.bitRate,
+              numChannels: 1,
+            ),
+            path: recordingPath,
+          );
+
+          // Record for the chunk duration
+          await Future.delayed(chunkDuration);
+
+          if (!_isStreamingMode) break;
+
+          // Stop recording and process the chunk
+          final recordedPath = await _audioRecorder.stop();
+
+          if (recordedPath != null && _isStreamingMode) {
+            final audioFile = File(recordedPath);
+            if (await audioFile.exists()) {
+              final audioBytes = await audioFile.readAsBytes();
+
+              // Only process if we have sufficient audio data
+              if (audioBytes.length > 8000) {
+                // At least 8KB
+                try {
+                  final result = await transcribeBytes(
+                    audioBytes,
+                    format: AudioFormat.wav,
+                    sampleRate: _config.sampleRate,
+                  );
+
+                  // Only emit meaningful transcriptions
+                  if (result.isNotEmpty &&
+                      result.trim() != "..." &&
+                      result.toLowerCase() != "no speech detected" &&
+                      !result.toLowerCase().contains("error") &&
+                      result.trim().length > 1) {
+                    print('🎤 Streaming chunk: "$result"');
+
+                    if (_transcriptionController != null &&
+                        !_transcriptionController!.isClosed) {
+                      _transcriptionController!.add(result);
+                    }
+                  }
+                } catch (e) {
+                  print('❌ Error processing streaming chunk: $e');
+                  // Continue streaming despite processing errors
+                }
+              }
+
+              // Clean up the audio file
+              try {
+                await audioFile.delete();
+              } catch (e) {
+                print('Warning: Failed to delete chunk file: $e');
+              }
+            }
+          }
+
+          // Small delay before next chunk to avoid overwhelming the system
+          if (_isStreamingMode) {
+            await Future.delayed(const Duration(milliseconds: 100));
+          }
+        } catch (e) {
+          print('❌ Error in streaming chunk cycle: $e');
+          // Continue streaming despite individual chunk errors
+          await Future.delayed(const Duration(milliseconds: 500));
+        }
+      }
+    } catch (e) {
+      print('❌ Fatal streaming error: $e');
+      _isStreamingMode = false;
+      _transcriptionController?.addError(e);
+    } finally {
+      print('🎤 Streaming loop ended');
+    }
+  }
+
+  /// Stop streaming transcription - enhanced version
+  Future<void> stopStreamingTranscription() async {
+    print('🎤 Stopping streaming transcription...');
+
+    _isStreamingMode = false;
+
+    // Stop any ongoing recording
+    if (_isRecording) {
+      try {
+        await _audioRecorder.stop();
+        _isRecording = false;
+      } catch (e) {
+        print('Warning: Error stopping recording: $e');
+      }
+    }
+
+    // Close the transcription controller
+    if (_transcriptionController != null &&
+        !_transcriptionController!.isClosed) {
+      _transcriptionController!.close();
+    }
+    _transcriptionController = null;
+
+    print('✅ Streaming transcription stopped');
+  }
+
   Future<String> recordAndTranscribe(Duration duration) async {
     _checkInitialized();
 
