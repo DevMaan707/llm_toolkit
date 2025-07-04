@@ -1,4 +1,3 @@
-// lib/src/services/asr_service.dart
 import 'dart:async';
 import 'dart:typed_data';
 import 'dart:io';
@@ -65,7 +64,6 @@ class ASRService {
         throw InferenceException('ASR engine not available');
       }
 
-      // Convert audio bytes to samples - let the engine handle this
       final audioSamples = await _asrEngine!.convertAudioToSamples(
         audioBytes,
         AudioFormat.wav,
@@ -74,8 +72,6 @@ class ASRService {
       if (audioSamples.isEmpty) {
         return '';
       }
-
-      // Let the engine preprocess to mel frames - this should be exposed
       final melFrames = await _asrEngine!.preprocessAudioSamples(audioSamples);
 
       // Use inferChunk for fast processing
@@ -287,10 +283,11 @@ class ASRService {
     }
   }
 
-  /// Continuous streaming implementation with proper chunk processing
-  Future<void> _startContinuousStreaming() async {
-    const chunkDuration = Duration(milliseconds: 2000); // 2 second chunks
-    const overlapDuration = Duration(milliseconds: 500); // 0.5 second overlap
+  Future _startContinuousStreaming() async {
+    const chunkDuration = Duration(milliseconds: 6000); // 6 second chunks
+    const overlapDuration = Duration(milliseconds: 1500); // 1.5 second overlap
+    const minAudioThreshold =
+        96000; // Minimum bytes for 6 seconds at 16kHz mono
 
     try {
       final tempDir = await getTemporaryDirectory();
@@ -300,7 +297,6 @@ class ASRService {
             '${tempDir.path}/stream_chunk_${DateTime.now().millisecondsSinceEpoch}.wav';
 
         try {
-          // Start recording this chunk
           await _audioRecorder.start(
             RecordConfig(
               encoder: AudioEncoder.wav,
@@ -311,12 +307,10 @@ class ASRService {
             path: recordingPath,
           );
 
-          // Record for the chunk duration
           await Future.delayed(chunkDuration);
 
           if (!_isStreamingMode) break;
 
-          // Stop recording and process the chunk
           final recordedPath = await _audioRecorder.stop();
 
           if (recordedPath != null && _isStreamingMode) {
@@ -324,9 +318,8 @@ class ASRService {
             if (await audioFile.exists()) {
               final audioBytes = await audioFile.readAsBytes();
 
-              // Only process if we have sufficient audio data
-              if (audioBytes.length > 8000) {
-                // At least 8KB
+              // Only process chunks with sufficient audio data
+              if (audioBytes.length > minAudioThreshold) {
                 try {
                   final result = await transcribeBytes(
                     audioBytes,
@@ -334,13 +327,8 @@ class ASRService {
                     sampleRate: _config.sampleRate,
                   );
 
-                  // Only emit meaningful transcriptions
-                  if (result.isNotEmpty &&
-                      result.trim() != "..." &&
-                      result.toLowerCase() != "no speech detected" &&
-                      !result.toLowerCase().contains("error") &&
-                      result.trim().length > 1) {
-                    print('🎤 Streaming chunk: "$result"');
+                  if (TFLiteASREngine().isValidTranscription(result)) {
+                    print('🎤 Streaming chunk result: "$result"');
 
                     if (_transcriptionController != null &&
                         !_transcriptionController!.isClosed) {
@@ -349,11 +337,13 @@ class ASRService {
                   }
                 } catch (e) {
                   print('❌ Error processing streaming chunk: $e');
-                  // Continue streaming despite processing errors
                 }
+              } else {
+                print(
+                  '⚠️ Chunk too small, skipping (${audioBytes.length} bytes)',
+                );
               }
 
-              // Clean up the audio file
               try {
                 await audioFile.delete();
               } catch (e) {
@@ -362,14 +352,12 @@ class ASRService {
             }
           }
 
-          // Small delay before next chunk to avoid overwhelming the system
           if (_isStreamingMode) {
-            await Future.delayed(const Duration(milliseconds: 100));
+            await Future.delayed(const Duration(milliseconds: 500));
           }
         } catch (e) {
           print('❌ Error in streaming chunk cycle: $e');
-          // Continue streaming despite individual chunk errors
-          await Future.delayed(const Duration(milliseconds: 500));
+          await Future.delayed(const Duration(milliseconds: 1000));
         }
       }
     } catch (e) {
@@ -377,7 +365,7 @@ class ASRService {
       _isStreamingMode = false;
       _transcriptionController?.addError(e);
     } finally {
-      print('🎤 Streaming loop ended');
+      print('🎤 Enhanced streaming loop ended');
     }
   }
 

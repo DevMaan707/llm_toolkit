@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:io';
 import 'dart:math' as math;
-import 'dart:isolate';
 import 'package:tflite_flutter/tflite_flutter.dart';
 import 'package:record/record.dart';
 import 'package:path_provider/path_provider.dart';
@@ -11,11 +10,8 @@ import 'package:flutter/foundation.dart';
 import '../config.dart';
 import 'base_inference_engine.dart';
 import '../../exceptions/llm_toolkit_exceptions.dart';
-import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:http/http.dart' as http;
-import 'package:path_provider/path_provider.dart';
 
 class TFLiteASREngine extends BaseInferenceEngine {
   // Core TFLite components
@@ -38,14 +34,13 @@ class TFLiteASREngine extends BaseInferenceEngine {
   static const int N_FFT = 400;
   static const int HOP_LENGTH = 160;
   static const int N_FRAMES = 3000;
-  static const int MAX_AUDIO_LENGTH = 480000; // 30 seconds at 16kHz
+  static const int MAX_AUDIO_LENGTH = 480000;
   static const double LOG_EPSILON = 1e-10;
-  static const double SILENCE_VALUE = -11.512925; // log(1e-5)
+  static const double SILENCE_VALUE = -11.512925;
 
-  // Streaming parameters
   final List<double> _audioBuffer = [];
-  static const int CHUNK_SIZE = 8000; // 0.5 seconds at 16kHz
-  static const int OVERLAP_SIZE = 1600; // 0.1 seconds overlap
+  static const int CHUNK_SIZE = 8000;
+  static const int OVERLAP_SIZE = 1600;
 
   // Pre-computed components for performance
   late FFT _fft;
@@ -55,10 +50,9 @@ class TFLiteASREngine extends BaseInferenceEngine {
 
   // Model-specific configurations
   late ModelConfig _modelConfig;
-  static const int MIN_FRAMES = 100; // Minimum frames for short audio
-  static const int SHORT_AUDIO_THRESHOLD = 5 * SAMPLE_RATE; // 5 seconds
-  static const double SILENCE_THRESHOLD =
-      0.01; // RMS threshold for silence detection
+  static const int MIN_FRAMES = 100;
+  static const int SHORT_AUDIO_THRESHOLD = 5 * SAMPLE_RATE;
+  static const double SILENCE_THRESHOLD = 0.01;
   static const int MIN_CHUNK_SIZE = 32000;
   // Performance monitoring
   final Map<String, int> _performanceMetrics = {
@@ -272,46 +266,32 @@ class TFLiteASREngine extends BaseInferenceEngine {
   ) {
     print('🎤 Enhanced Whisper preprocessing:');
     print('   Input samples: ${audioSamples.length}');
-
     try {
-      // Step 1: Detect if audio is mostly silence
       final silenceInfo = _detectSilence(audioSamples);
       print('   Silence detection: ${silenceInfo['percentage']}% silence');
 
       if (silenceInfo['percentage'] > 90.0) {
         print('⚠️ Audio is mostly silence, using minimal processing');
-        // For mostly silent audio, use a shorter context
         return _processShortAudio(audioSamples);
       }
-
-      // Step 2: Calculate minimal padding based on actual audio length
       final int nFrames =
           ((audioSamples.length - N_FFT) / HOP_LENGTH).floor() + 1;
       final int minTargetLength = (nFrames - 1) * HOP_LENGTH + N_FFT;
-
-      // Use adaptive padding - not always full 30 seconds
-      final int targetLength = _calculateAdaptiveLength(
+      final int targetLength = _calculateOptimalLength(
         audioSamples.length,
         minTargetLength,
       );
 
       List<double> paddedAudio = List.from(audioSamples);
-
-      // Pad only to calculated target length
       while (paddedAudio.length < targetLength) {
-        paddedAudio.add(0.0); // Use 0.0 instead of SILENCE_VALUE for padding
+        paddedAudio.add(0.0);
       }
-
       print(
         '   Adaptive padding: ${audioSamples.length} → ${paddedAudio.length} samples',
       );
       print('   Target frames: $nFrames');
-
-      // Step 3: Compute STFT with dynamic framing
       final stft = _computeAdaptiveSTFT(paddedAudio, nFrames);
       print('   STFT frames: ${stft.length}');
-
-      // Step 4: Apply mel filters
       final melFilters = _createWhisperMelFilterBankIsolate({
         'nFft': N_FFT ~/ 2 + 1,
         'nMels': N_MELS,
@@ -320,8 +300,6 @@ class TFLiteASREngine extends BaseInferenceEngine {
 
       final melSpectrogram = _applyMelFiltersIsolate(stft, melFilters);
       print('   Mel spectrogram: ${melSpectrogram.length} frames');
-
-      // Step 5: Adaptive output sizing
       return _createAdaptiveOutput(melSpectrogram, nFrames);
     } catch (e, stackTrace) {
       print('❌ Enhanced preprocessing error: $e');
@@ -330,57 +308,61 @@ class TFLiteASREngine extends BaseInferenceEngine {
     }
   }
 
-  static int _calculateAdaptiveLength(int actualLength, int minLength) {
-    // For very short audio (< 2 seconds), use minimal padding
-    if (actualLength < SAMPLE_RATE * 2) {
-      return math.max(
-        minLength,
-        actualLength + (SAMPLE_RATE ~/ 2),
-      ); // Add 0.5s padding
+  static int _calculateOptimalLength(int actualLength, int minLength) {
+    if (actualLength < SAMPLE_RATE * 5) {
+      final frames = ((actualLength - N_FFT) / HOP_LENGTH).floor() + 1;
+      return math.max(minLength, frames * HOP_LENGTH + N_FFT);
     }
-
-    // For medium audio (2-10 seconds), use proportional padding
-    if (actualLength < SAMPLE_RATE * 10) {
-      return math.max(minLength, (actualLength * 1.2).round()); // 20% padding
+    if (actualLength < SAMPLE_RATE * 15) {
+      return math.max(minLength, (actualLength * 1.1).round());
     }
-
-    // For longer audio, use full context
-    return math.min(MAX_AUDIO_LENGTH, math.max(minLength, actualLength));
+    return math.min(SAMPLE_RATE * 20, math.max(minLength, actualLength));
   }
 
-  /// Detect silence in audio
   static Map<String, dynamic> _detectSilence(List<double> audio) {
     if (audio.isEmpty) return {'percentage': 100.0, 'threshold': 0.01};
 
-    const double silenceThreshold = 0.01;
-    int silentSamples = 0;
+    const double silenceThreshold = 0.015; // Slightly higher threshold
+    const int windowSize = 1600; // 100ms windows at 16kHz
 
-    for (double sample in audio) {
-      if (sample.abs() < silenceThreshold) {
-        silentSamples++;
+    int silentWindows = 0;
+    int totalWindows = (audio.length / windowSize).floor();
+
+    for (int i = 0; i < totalWindows; i++) {
+      final start = i * windowSize;
+      final end = math.min(start + windowSize, audio.length);
+      final window = audio.sublist(start, end);
+
+      // Calculate RMS for window
+      double rms = 0.0;
+      for (final sample in window) {
+        rms += sample * sample;
+      }
+      rms = math.sqrt(rms / window.length);
+
+      if (rms < silenceThreshold) {
+        silentWindows++;
       }
     }
 
-    final percentage = (silentSamples / audio.length) * 100;
+    final percentage =
+        totalWindows > 0 ? (silentWindows / totalWindows) * 100 : 100.0;
+
     return {
       'percentage': percentage,
       'threshold': silenceThreshold,
-      'silentSamples': silentSamples,
-      'totalSamples': audio.length,
+      'silentWindows': silentWindows,
+      'totalWindows': totalWindows,
+      'recommendedAction': percentage > 80 ? 'skip' : 'process',
     };
   }
 
-  /// Process very short or mostly silent audio
   static List<double> _processShortAudio(List<double> audioSamples) {
     print('🔧 Processing short/silent audio with minimal context');
-
-    // Use a much smaller context for short audio
-    const int shortContextFrames = 500; // ~5 seconds worth of frames
+    const int shortContextFrames = 500;
     const int shortContextSize = N_MELS * shortContextFrames;
-
-    // Still do basic processing but with smaller output
     final paddedAudio = List<double>.from(audioSamples);
-    final minLength = N_FFT + HOP_LENGTH * 10; // Minimum for basic STFT
+    final minLength = N_FFT + HOP_LENGTH * 10;
 
     while (paddedAudio.length < minLength) {
       paddedAudio.add(0.0);
@@ -394,8 +376,6 @@ class TFLiteASREngine extends BaseInferenceEngine {
     });
 
     final melSpectrogram = _applyMelFiltersIsolate(stft, melFilters);
-
-    // Create shorter output and pad to expected model input size
     final flattened = <double>[];
     for (int frame = 0; frame < shortContextFrames; frame++) {
       for (int mel = 0; mel < N_MELS; mel++) {
@@ -407,8 +387,6 @@ class TFLiteASREngine extends BaseInferenceEngine {
         }
       }
     }
-
-    // Pad to full model input size if needed
     while (flattened.length < N_MELS * N_FRAMES) {
       flattened.add(SILENCE_VALUE);
     }
@@ -507,17 +485,14 @@ class TFLiteASREngine extends BaseInferenceEngine {
     }
 
     try {
-      print('🎤 Starting chunked audio transcription...');
+      print('🎤 Starting enhanced chunked transcription...');
 
-      // Convert to samples
       final audioSamples = await convertAudioToSamples(audioData, format);
-      print('   Audio samples: ${audioSamples.length}');
-
-      // Determine if chunking is beneficial
       final durationSeconds = audioSamples.length / sampleRate;
+
       print('   Audio duration: ${durationSeconds.toStringAsFixed(2)}s');
 
-      if (!useChunking || durationSeconds < 2.0) {
+      if (!useChunking || durationSeconds < 6.0) {
         print('   Using direct inference for short audio');
         return await transcribeAudio(
           audioData,
@@ -526,26 +501,29 @@ class TFLiteASREngine extends BaseInferenceEngine {
         );
       }
 
-      // Chunk the audio
+      // Enhanced chunking parameters
       const chunkDuration = 10.0; // 10 second chunks
-      const overlapDuration = 1.0; // 1 second overlap
+      const overlapDuration = 2.0; // 2 second overlap
 
       final chunkSize = (chunkDuration * sampleRate).round();
       final overlapSize = (overlapDuration * sampleRate).round();
       final stepSize = chunkSize - overlapSize;
 
       final transcriptions = <String>[];
+      final processedWords = <String>{};
 
       for (int start = 0; start < audioSamples.length; start += stepSize) {
         final end = math.min(start + chunkSize, audioSamples.length);
         final chunk = audioSamples.sublist(start, end);
+
+        // Skip chunks that are too short
+        if (chunk.length < sampleRate * 3) continue; // Minimum 3 seconds
 
         print(
           '   Processing chunk: ${start ~/ sampleRate}s - ${end ~/ sampleRate}s',
         );
 
         try {
-          // Convert chunk back to bytes for processing
           final chunkBytes = await _samplesToWavBytes(chunk, sampleRate);
           final chunkTranscription = await transcribeAudio(
             chunkBytes,
@@ -553,9 +531,16 @@ class TFLiteASREngine extends BaseInferenceEngine {
             format: AudioFormat.wav,
           );
 
-          if (chunkTranscription.trim().isNotEmpty &&
-              !chunkTranscription.toLowerCase().contains('no speech')) {
-            transcriptions.add(chunkTranscription.trim());
+          if (isValidTranscription(chunkTranscription)) {
+            // Remove duplicate words from overlap
+            final words = chunkTranscription.split(' ');
+            final newWords =
+                words.where((word) => !processedWords.contains(word)).toList();
+
+            if (newWords.isNotEmpty) {
+              transcriptions.add(newWords.join(' '));
+              processedWords.addAll(newWords);
+            }
           }
         } catch (e) {
           print('   Chunk processing error: $e');
@@ -564,13 +549,11 @@ class TFLiteASREngine extends BaseInferenceEngine {
       }
 
       final result = transcriptions.join(' ').trim();
-      print(
-        '✅ Chunked transcription complete: "${result.substring(0, math.min(100, result.length))}"',
-      );
+      print('✅ Enhanced chunked transcription complete');
 
       return result.isEmpty ? 'No speech detected' : result;
     } catch (e) {
-      throw InferenceException('Chunked transcription failed: $e');
+      throw InferenceException('Enhanced chunked transcription failed: $e');
     }
   }
 
@@ -1553,7 +1536,7 @@ class TFLiteASREngine extends BaseInferenceEngine {
                   );
 
                   // Emit if transcription is meaningful
-                  if (_isValidTranscription(transcription)) {
+                  if (isValidTranscription(transcription)) {
                     print('🎤 Streaming result: "$transcription"');
                     yield transcription;
                   }
@@ -1593,7 +1576,7 @@ class TFLiteASREngine extends BaseInferenceEngine {
     }
   }
 
-  bool _isValidTranscription(String transcription) {
+  bool isValidTranscription(String transcription) {
     if (transcription.trim().isEmpty) return false;
     if (transcription.trim() == "...") return false;
     if (transcription.toLowerCase() == "no speech detected") return false;
