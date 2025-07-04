@@ -322,8 +322,8 @@ class TFLiteASREngine extends BaseInferenceEngine {
   static Map<String, dynamic> _detectSilence(List<double> audio) {
     if (audio.isEmpty) return {'percentage': 100.0, 'threshold': 0.01};
 
-    const double silenceThreshold = 0.015; // Slightly higher threshold
-    const int windowSize = 1600; // 100ms windows at 16kHz
+    const double silenceThreshold = 0.015;
+    const int windowSize = 1600;
 
     int silentWindows = 0;
     int totalWindows = (audio.length / windowSize).floor();
