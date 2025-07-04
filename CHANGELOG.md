@@ -1,5 +1,83 @@
 # LLM Toolkit SDK Changelog
 
+## Version 0.0.4 - *July 4, 2025*
+
+### 🎤 New Features - Speech Recognition (ASR)
+- **Complete ASR Integration** - Full TensorFlow Lite ASR engine with Whisper model support
+- **Real-time Speech Recognition** - Live streaming transcription with continuous audio processing
+- **Multi-format Audio Support** - WAV, PCM16, PCM32, Float32 audio format compatibility
+- **Advanced Audio Preprocessing** - Whisper-compatible mel-spectrogram generation with FFT processing
+- **Voice Activity Detection (VAD)** - Smart silence detection and automatic recording termination
+- **Chunked Audio Processing** - Efficient handling of long audio files with overlap management
+- **ASR Service Layer** - High-level service wrapper for easy speech recognition integration
+- **Microphone Integration** - Native microphone access with permission handling
+
+### 🔊 ASR Technical Features
+- **Enhanced Audio Pipeline** - Optimized mel-filter bank computation with isolate processing
+- **Adaptive Processing** - Dynamic audio length optimization based on content characteristics
+- **Silence Detection** - Advanced RMS-based silence detection with configurable thresholds
+- **Audio Resampling** - High-quality interpolation-based audio resampling for format compatibility
+- **Model Type Detection** - Automatic ASR model type detection (Whisper, Wav2Vec2, DeepSpeech)
+- **Streaming Optimization** - Low-latency streaming with configurable chunk sizes and overlap
+- **Memory Efficient** - Optimized for mobile devices with minimal memory footprint
+- **Error Recovery** - Robust error handling with graceful fallbacks for audio processing
+
+### 🎯 ASR Configuration Options
+- **ASRConfig Class** - Comprehensive configuration for sample rates, bit rates, and streaming parameters
+- **Quality Presets** - Pre-built configurations for high-quality, low-latency, mobile, and streaming scenarios
+- **VAD Settings** - Configurable voice activity detection with silence timeouts and thresholds
+- **Performance Tuning** - Adjustable confidence thresholds and token limits for optimal performance
+- **Streaming Parameters** - Customizable streaming intervals and chunk processing settings
+
+### 🔧 ASR Service Methods
+- **File Transcription** - `transcribeFile()` for processing audio files with enhanced chunking
+- **Byte Transcription** - `transcribeBytes()` for direct audio data processing
+- **Live Recording** - `startRecording()` / `stopRecording()` for real-time audio capture
+- **Streaming Recognition** - `startStreamingTranscription()` for continuous live transcription
+- **VAD Recording** - `recordWithVAD()` for intelligent voice-activated recording
+- **Timed Recording** - `recordAndTranscribe()` for fixed-duration audio capture
+
+### 🎤 ASR Audio Processing
+- **WAV Header Parsing** - Complete WAV file format validation and metadata extraction
+- **Multi-channel Support** - Automatic stereo-to-mono conversion for ASR compatibility
+- **Audio Validation** - Comprehensive audio file validation with detailed error reporting
+- **Format Detection** - Automatic audio format detection and appropriate decoder selection
+- **Quality Metrics** - Audio quality assessment and processing recommendations
+
+### ⚠️ Current Limitations
+- **ASR Status**: ASR functionality is implemented but currently experiencing stability issues and may not work reliably in all scenarios
+- **Multimodal Status**: Multimodal image+text generation is implemented but not thoroughly tested - use with caution
+- **Platform Compatibility**: ASR features may have varying performance across different Android devices
+- **Model Compatibility**: Some ASR models may require specific preprocessing that hasn't been fully optimized
+
+### 🔧 Improvements from Previous Version
+- **Enhanced Multimodal Support** - Improved Gemma multimodal integration with proper image handling
+- **Better Engine Detection** - More accurate ASR model type detection and configuration
+- **Optimized Memory Usage** - Reduced memory footprint for ASR processing on mobile devices
+- **Improved Error Messages** - More descriptive error messages for ASR-related issues
+- **Debug Enhancements** - Extended debug console with ASR-specific logging and metrics
+
+### 🐛 Bug Fixes
+- Fixed audio preprocessing pipeline for Whisper model compatibility
+- Resolved memory leaks in continuous ASR processing
+- Corrected mel-spectrogram generation for various audio durations
+- Fixed streaming audio buffer management and overlap handling
+- Resolved TensorFlow Lite model loading issues for ASR engines
+- Fixed microphone permission handling across different Android versions
+
+### 📚 Documentation Updates
+- **ASR Integration Guide** - Complete guide for implementing speech recognition features
+- **Audio Processing Tutorial** - Technical documentation for audio preprocessing and format handling
+- **Streaming Best Practices** - Guidelines for optimal real-time speech recognition performance
+- **Troubleshooting Guide** - Common ASR issues and their solutions
+- **Model Compatibility Matrix** - Supported ASR models and their specific requirements
+
+### 🔮 Upcoming in Next Release
+- **ASR Stability Improvements** - Focus on resolving current ASR reliability issues
+- **Multimodal Testing** - Comprehensive testing and validation of image+text generation
+- **Additional ASR Models** - Support for more ASR model architectures and formats
+- **Performance Optimizations** - Further memory and speed optimizations for mobile deployment
+
 ## Version 0.0.3 - *July 1, 2025*
 
 ### 🚀 New Features
