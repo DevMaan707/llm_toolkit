@@ -1,5 +1,50 @@
 # CHANGELOG
 
+## 2026-03-06 20:23:39 UTC - Xyla Run 74e3a454-9a6c-44bd-ba03-45e4a122535a
+- Base branch: `main`
+- Dependency/analysis summary: Analyzed 48 files for documentation coverage, found 25 potential issues
+- Dependency/analysis findings: 25
+- Agent summary: Analyzed 30 files for documentation coverage, test coverage, found 25 potential issues
+- Files scanned by changelog-updater: 97
+- Top findings:
+  - [MEDIUM] `example/lib/data/recommended_models.dart:4` Implementation appears undocumented in CHANGELOG.md (e.g. RecommendedModelsData)
+  - [MEDIUM] `example/lib/main.dart:9` Implementation appears undocumented in CHANGELOG.md (e.g. LLMToolkitApp)
+  - [MEDIUM] `example/lib/models/app_models.dart:3` Implementation appears undocumented in CHANGELOG.md (e.g. LocalModel, RecommendedModel)
+  - [MEDIUM] `example/lib/screens/chat_screen.dart:11` Implementation appears undocumented in CHANGELOG.md (e.g. ChatScreen)
+  - [MEDIUM] `example/lib/screens/model_browser_screen.dart:14` Implementation appears undocumented in CHANGELOG.md (e.g. ModelBrowserScreen)
+  - [MEDIUM] `example/lib/screens/rag_chat_screen.dart:8` Implementation appears undocumented in CHANGELOG.md (e.g. RagChatScreen)
+  - [MEDIUM] `example/lib/services/asr_service_wrapper.dart:14` Implementation appears undocumented in CHANGELOG.md (e.g. ASRServiceWrapper)
+- Hotspots:
+  - `example/lib/data/recommended_models.dart`
+  - `example/lib/main.dart`
+  - `example/lib/models/app_models.dart`
+  - `example/lib/screens/chat_screen.dart`
+  - `example/lib/screens/model_browser_screen.dart`
+  - `example/lib/screens/rag_chat_screen.dart`
+  - `example/lib/services/asr_service_wrapper.dart`
+  - `example/lib/services/llm_service.dart`
+- Missing implementation notes added from current scan:
+  - `example/lib/widgets/common/loading_overlay.dart` implementation detected but not previously documented
+  - `example/lib/widgets/common/search_bar_widget.dart` implementation detected but not previously documented
+  - `example/lib/widgets/debug/debug_panel.dart` implementation detected but not previously documented
+  - `example/lib/widgets/rag/rag_chat_section.dart` implementation detected but not previously documented
+  - `example/lib/widgets/rag/rag_documents_section.dart` implementation detected but not previously documented
+  - `example/lib/widgets/rag/rag_setup_section.dart` implementation detected but not previously documented
+  - `example/lib/widgets/status/model_status_card.dart` implementation detected but not previously documented
+  - `example/lib/widgets/tabs/asr_tab.dart` implementation detected but not previously documented
+  - `example/lib/widgets/tabs/downloaded_tab.dart` implementation detected but not previously documented
+  - `example/lib/widgets/tabs/rag_tab.dart` implementation detected but not previously documented
+  - `example/lib/widgets/tabs/recommended_tab.dart` implementation detected but not previously documented
+  - `example/lib/widgets/tabs/search_tab.dart` implementation detected but not previously documented
+  - `lib/llm_toolkit.dart` implementation detected but not previously documented
+  - `lib/src/core/base_provider.dart` implementation detected but not previously documented
+  - `lib/src/core/cache_manager.dart` implementation detected but not previously documented
+  - `lib/src/core/config.dart` implementation detected but not previously documented
+  - `lib/src/core/download_manager.dart` implementation detected but not previously documented
+  - `lib/src/core/inference/base_inference_engine.dart` implementation detected but not previously documented
+  - `lib/src/core/inference/gemma_engine.dart` implementation detected but not previously documented
+  - `lib/src/core/inference/inference_manager.dart` implementation detected but not previously documented
+
 ## 2026-03-06 16:14:02 UTC - Xyla Run 284b072a-de88-44cc-b20b-c01068114ded
 - Base branch: `main`
 - Dependency/analysis summary: Analyzed 60 files, no obvious issues found
