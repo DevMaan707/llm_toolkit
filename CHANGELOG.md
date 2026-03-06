@@ -1,5 +1,90 @@
 # CHANGELOG
 
+## 2026-03-06 20:47:54 UTC - Xyla Run 32372553-1b53-4e00-af40-f2c05f173e9c
+- Base branch: `main`
+- Dependency/analysis summary: Analyzed 60 files for documentation coverage, found 64 potential issues
+- Dependency/analysis findings: 64
+- Agent summary: Analyzed 23 files for documentation coverage, error handling, security, test coverage, found 18 potential issues
+- Files scanned by changelog-writer: 97
+- User-facing documentation generated for 64 undocumented implementations:
+  - `ASRServiceWrapper` in `example/lib/services/asr_service_wrapper.dart:14` is now documented as a service capability with its current implementation behavior.
+  - `ASRService` in `lib/src/services/asr_service.dart:10` is now documented as a service capability with its current implementation behavior.
+  - `AppColors` in `example/lib/utils/app_colors.dart:3` is now documented as a theming utility with its current implementation behavior.
+  - `AppLogger` in `example/lib/utils/logger.dart:19` is now documented as a utility helper with its current implementation behavior.
+  - `AppTheme` in `example/lib/theme/app_theme.dart:3` is now documented as a theming utility with its current implementation behavior.
+  - `AsrTab` in `example/lib/widgets/tabs/asr_tab.dart:8` is now documented as a UI component with its current implementation behavior.
+  - `BrowseButton` in `example/lib/widgets/common/browse_button.dart:3` is now documented as a UI component with its current implementation behavior.
+  - `ChatBubble` in `example/lib/widgets/chat/chat_bubble.dart:4` is now documented as a UI component with its current implementation behavior.
+  - `ChatInput` in `example/lib/widgets/chat/chat_input.dart:3` is now documented as a UI component with its current implementation behavior.
+  - `ChatScreen` in `example/lib/screens/chat_screen.dart:11` is now documented as a UI component, including state and storage handling and user interface behavior.
+  - `ChatSettingsDialog` in `example/lib/widgets/chat/chat_settings_dialog.dart:3` is now documented as a UI component with its current implementation behavior.
+  - `ColorUtils` in `example/lib/utils/color_utils.dart:3` is now documented as a theming utility with its current implementation behavior.
+  - `CustomAppBar` in `example/lib/widgets/common/custom_app_bar.dart:3` is now documented as a UI component with its current implementation behavior.
+  - `DebugPanel` in `example/lib/widgets/debug/debug_panel.dart:5` is now documented as a UI component with its current implementation behavior.
+  - `DeviceInfoCard` in `example/lib/widgets/cards/device_info_card.dart:4` is now documented as a UI component with its current implementation behavior.
+  - `DownloadException` in `lib/src/exceptions/llm_toolkit_exceptions.dart:21` is now documented as a implementation component with its current implementation behavior.
+  - `DownloadedTab` in `example/lib/widgets/tabs/downloaded_tab.dart:7` is now documented as a UI component with its current implementation behavior.
+  - `EmptyState` in `example/lib/widgets/common/empty_state.dart:3` is now documented as a UI component with its current implementation behavior.
+  - `FileCard` in `example/lib/widgets/cards/file_card.dart:7` is now documented as a UI component with its current implementation behavior.
+  - `Formatters` in `example/lib/utils/formatters.dart:1` is now documented as a utility helper with its current implementation behavior.
+  - `GemmaInferenceEngine` in `lib/src/core/inference/gemma_engine.dart:12` is now documented as a core runtime component with its current implementation behavior.
+  - `HuggingFaceProvider` in `lib/src/core/providers/huggingface/hf_provider.dart:11` is now documented as a core runtime component with its current implementation behavior.
+  - `InferenceConfig` in `lib/src/core/config.dart:4` is now documented as a core runtime component with its current implementation behavior.
+  - `InferenceEngineType` in `lib/src/core/model_detector.dart:3` is now documented as a data model with its current implementation behavior.
+  - `InferenceException` in `lib/src/exceptions/llm_toolkit_exceptions.dart:16` is now documented as a implementation component with its current implementation behavior.
+  - `InferenceManager` in `lib/src/core/inference/inference_manager.dart:13` is now documented as a core runtime component with its current implementation behavior.
+  - `InputSuggestions` in `example/lib/widgets/chat/input_suggestions.dart:3` is now documented as a UI component with its current implementation behavior.
+  - `LLMService` in `example/lib/services/llm_service.dart:14` is now documented as a service capability with its current implementation behavior.
+  - `LLMToolkitApp` in `example/lib/main.dart:9` is now documented as a UI component, including state and storage handling and user interface behavior.
+  - `LLMToolkitException` in `lib/src/exceptions/llm_toolkit_exceptions.dart:1` is now documented as a implementation component with its current implementation behavior.
+  - `LLMToolkit` in `lib/llm_toolkit.dart:19` is now documented as a implementation component with its current implementation behavior.
+  - `LlamaInferenceEngine` in `lib/src/core/inference/llama_engine.dart:9` is now documented as a core runtime component with its current implementation behavior.
+  - `LoadingOverlay` in `example/lib/widgets/common/loading_overlay.dart:3` is now documented as a UI component with its current implementation behavior.
+  - `LocalModelCard` in `example/lib/widgets/cards/local_model_card.dart:7` is now documented as a UI component with its current implementation behavior.
+  - `LocalModel` in `example/lib/models/app_models.dart:3` is now documented as a data model, including file and asset operations.
+  - `LogEntry` in `example/lib/utils/logger.dart:5` is now documented as a utility helper with its current implementation behavior.
+  - `LogLevel` in `example/lib/utils/logger.dart:3` is now documented as a utility helper with its current implementation behavior.
+  - `MessageActions` in `example/lib/widgets/chat/message_actions.dart:3` is now documented as a UI component with its current implementation behavior.
+  - `ModelBrowserScreen` in `example/lib/screens/model_browser_screen.dart:14` is now documented as a UI component, including state and storage handling and user interface behavior.
+  - `ModelCard` in `example/lib/widgets/cards/model_card.dart:7` is now documented as a UI component with its current implementation behavior.
+  - `ModelDetector` in `lib/src/core/model_detector.dart:5` is now documented as a data model with its current implementation behavior.
+  - `ModelFormat` in `lib/src/core/search_query.dart:23` is now documented as a core runtime component with its current implementation behavior.
+  - `ModelInfo` in `lib/src/core/model_info.dart:1` is now documented as a data model with its current implementation behavior.
+  - `ModelProviderException` in `lib/src/exceptions/llm_toolkit_exceptions.dart:11` is now documented as a implementation component with its current implementation behavior.
+  - `ModelStatusCard` in `example/lib/widgets/status/model_status_card.dart:5` is now documented as a UI component with its current implementation behavior.
+  - `RagChatSection` in `example/lib/widgets/rag/rag_chat_section.dart:5` is now documented as a UI component, including state and storage handling and user interface behavior.
+  - `RagConfig` in `lib/src/core/rag/models/rag_models.dart:32` is now documented as a data model, including retrieval-augmented generation flow.
+  - `RagDocumentsSection` in `example/lib/widgets/rag/rag_documents_section.dart:5` is now documented as a UI component, including state and storage handling and user interface behavior.
+  - `RagResponse` in `lib/src/core/rag/models/rag_models.dart:18` is now documented as a data model, including API/network request handling and retrieval-augmented generation flow.
+  - `RagSetupSection` in `example/lib/widgets/rag/rag_setup_section.dart:5` is now documented as a UI component, including state and storage handling and user interface behavior.
+  - `RagTab` in `example/lib/widgets/tabs/rag_tab.dart:9` is now documented as a UI component, including state and storage handling and user interface behavior.
+  - `RecommendedModelCard` in `example/lib/widgets/cards/recommended_model_card.dart:6` is now documented as a UI component with its current implementation behavior.
+  - `RecommendedModel` in `example/lib/models/app_models.dart:19` is now documented as a data model with its current implementation behavior.
+  - `RecommendedModelsData` in `example/lib/data/recommended_models.dart:4` is now documented as a data model with its current implementation behavior.
+  - `RecommendedTab` in `example/lib/widgets/tabs/recommended_tab.dart:6` is now documented as a UI component with its current implementation behavior.
+  - `SearchBarWidget` in `example/lib/widgets/common/search_bar_widget.dart:3` is now documented as a UI component with its current implementation behavior.
+  - `SearchQuery` in `lib/src/core/search_query.dart:1` is now documented as a core runtime component with its current implementation behavior.
+  - `SearchTab` in `example/lib/widgets/tabs/search_tab.dart:8` is now documented as a UI component with its current implementation behavior.
+  - `SortBy` in `lib/src/core/search_query.dart:27` is now documented as a core runtime component with its current implementation behavior.
+  - `SortDirection` in `lib/src/core/search_query.dart:29` is now documented as a core runtime component with its current implementation behavior.
+  - `TFLiteInferenceEngine` in `lib/src/core/inference/tflite_engine.dart:8` is now documented as a core runtime component with its current implementation behavior.
+  - `TaskType` in `lib/src/core/search_query.dart:25` is now documented as a core runtime component with its current implementation behavior.
+  - `TypingIndicator` in `example/lib/widgets/chat/typing_indicator.dart:3` is now documented as a UI component with its current implementation behavior.
+  - `VectorStorageException` in `lib/src/exceptions/llm_toolkit_exceptions.dart:26` is now documented as a implementation component with its current implementation behavior.
+- Hotspots:
+  - `lib/src/core/rag/models/rag_models.dart`
+  - `example/lib/widgets/rag/rag_chat_section.dart`
+  - `example/lib/widgets/rag/rag_documents_section.dart`
+  - `example/lib/widgets/rag/rag_setup_section.dart`
+  - `example/lib/widgets/tabs/rag_tab.dart`
+  - `lib/llm_toolkit.dart`
+  - `lib/src/core/providers/huggingface/hf_provider.dart`
+  - `example/lib/data/recommended_models.dart`
+  - `example/lib/main.dart`
+  - `example/lib/models/app_models.dart`
+  - `example/lib/screens/chat_screen.dart`
+  - `example/lib/screens/model_browser_screen.dart`
+
 ## 2026-03-06 20:46:46 UTC - Xyla Run 9ee449a2-819a-4655-9ecd-5f00d5c93df6
 - Base branch: `main`
 - Dependency/analysis summary: Analyzed 60 files for documentation coverage, found 62 potential issues
