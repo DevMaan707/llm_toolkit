@@ -1,5 +1,42 @@
 # CHANGELOG
 
+## 2026-03-06 16:14:02 UTC - Xyla Run 284b072a-de88-44cc-b20b-c01068114ded
+- Base branch: `main`
+- Dependency/analysis summary: Analyzed 60 files, no obvious issues found
+- Dependency/analysis findings: 0
+- Agent summary: Analyzed 60 files, no obvious issues found
+- Files scanned by changelog-updater: 97
+- Hotspots:
+  - `example/lib/data/recommended_models.dart`
+  - `example/lib/main.dart`
+  - `example/lib/models/app_models.dart`
+  - `example/lib/screens/chat_screen.dart`
+  - `example/lib/screens/model_browser_screen.dart`
+  - `example/lib/screens/rag_chat_screen.dart`
+  - `example/lib/services/asr_service_wrapper.dart`
+  - `example/lib/services/llm_service.dart`
+- Missing implementation notes added from current scan:
+  - `example/lib/services/rag_service.dart` implementation detected but not previously documented
+  - `example/lib/theme/app_theme.dart` implementation detected but not previously documented
+  - `example/lib/utils/app_colors.dart` implementation detected but not previously documented
+  - `example/lib/utils/color_utils.dart` implementation detected but not previously documented
+  - `example/lib/utils/formatters.dart` implementation detected but not previously documented
+  - `example/lib/utils/logger.dart` implementation detected but not previously documented
+  - `example/lib/widgets/cards/device_info_card.dart` implementation detected but not previously documented
+  - `example/lib/widgets/cards/file_card.dart` implementation detected but not previously documented
+  - `example/lib/widgets/cards/local_model_card.dart` implementation detected but not previously documented
+  - `example/lib/widgets/cards/model_card.dart` implementation detected but not previously documented
+  - `example/lib/widgets/cards/recommended_model_card.dart` implementation detected but not previously documented
+  - `example/lib/widgets/chat/chat_bubble.dart` implementation detected but not previously documented
+  - `example/lib/widgets/chat/chat_input.dart` implementation detected but not previously documented
+  - `example/lib/widgets/chat/chat_settings_dialog.dart` implementation detected but not previously documented
+  - `example/lib/widgets/chat/input_suggestions.dart` implementation detected but not previously documented
+  - `example/lib/widgets/chat/message_actions.dart` implementation detected but not previously documented
+  - `example/lib/widgets/chat/typing_indicator.dart` implementation detected but not previously documented
+  - `example/lib/widgets/common/browse_button.dart` implementation detected but not previously documented
+  - `example/lib/widgets/common/custom_app_bar.dart` implementation detected but not previously documented
+  - `example/lib/widgets/common/empty_state.dart` implementation detected but not previously documented
+
 ## 2026-03-06 09:45:55 UTC - Xyla Run 308fcbc4-c76e-4fab-ba4f-60e464d57150
 - Base branch: `main`
 - Dependency/analysis summary: Analyzed 20 files, no obvious issues found
