@@ -1,5 +1,66 @@
 # CHANGELOG
 
+## 2026-03-06 20:34:17 UTC - Xyla Run d3051c31-a960-494a-acbf-1989eb39f46c
+- Base branch: `main`
+- Dependency/analysis summary: Analyzed 48 files for documentation coverage, found 25 potential issues
+- Dependency/analysis findings: 25
+- Agent summary: Analyzed 33 files for documentation coverage, security, test coverage, found 25 potential issues
+- Files scanned by changelog-writer: 97
+- Top findings:
+  - [MEDIUM] `example/lib/data/recommended_models.dart:4` Implementation appears undocumented in CHANGELOG.md (e.g. RecommendedModelsData)
+  - [MEDIUM] `example/lib/main.dart:9` Implementation appears undocumented in CHANGELOG.md (e.g. LLMToolkitApp)
+  - [MEDIUM] `example/lib/models/app_models.dart:3` Implementation appears undocumented in CHANGELOG.md (e.g. LocalModel, RecommendedModel)
+  - [MEDIUM] `example/lib/screens/chat_screen.dart:11` Implementation appears undocumented in CHANGELOG.md (e.g. ChatScreen)
+  - [MEDIUM] `example/lib/screens/model_browser_screen.dart:14` Implementation appears undocumented in CHANGELOG.md (e.g. ModelBrowserScreen)
+  - [MEDIUM] `example/lib/screens/rag_chat_screen.dart:8` Implementation appears undocumented in CHANGELOG.md (e.g. RagChatScreen)
+  - [MEDIUM] `example/lib/services/asr_service_wrapper.dart:14` Implementation appears undocumented in CHANGELOG.md (e.g. ASRServiceWrapper)
+- Hotspots:
+  - `example/lib/data/recommended_models.dart`
+  - `example/lib/main.dart`
+  - `example/lib/models/app_models.dart`
+  - `example/lib/screens/chat_screen.dart`
+  - `example/lib/screens/model_browser_screen.dart`
+  - `example/lib/screens/rag_chat_screen.dart`
+  - `example/lib/services/asr_service_wrapper.dart`
+  - `example/lib/services/llm_service.dart`
+  - `example/lib/services/rag_service.dart`
+  - `example/lib/theme/app_theme.dart`
+  - `example/lib/utils/app_colors.dart`
+  - `example/lib/utils/color_utils.dart`
+- Implementation evidence from analyzed code segments:
+  - `example/lib/data/recommended_models.dart:2-6` Implementation appears undocumented in CHANGELOG.md (e.g. RecommendedModelsData)
+  - `example/lib/main.dart:7-11` Implementation appears undocumented in CHANGELOG.md (e.g. LLMToolkitApp)
+  - `example/lib/models/app_models.dart:1-5` Implementation appears undocumented in CHANGELOG.md (e.g. LocalModel, RecommendedModel)
+  - `example/lib/screens/chat_screen.dart:9-13` Implementation appears undocumented in CHANGELOG.md (e.g. ChatScreen)
+  - `example/lib/screens/model_browser_screen.dart:12-16` Implementation appears undocumented in CHANGELOG.md (e.g. ModelBrowserScreen)
+  - `example/lib/screens/rag_chat_screen.dart:6-10` Implementation appears undocumented in CHANGELOG.md (e.g. RagChatScreen)
+- Missing implementation notes added from current scan:
+  - `example/lib/data/recommended_models.dart` implementation detected but not previously documented
+  - `example/lib/main.dart` implementation detected but not previously documented
+  - `example/lib/models/app_models.dart` implementation detected but not previously documented
+  - `example/lib/screens/chat_screen.dart` implementation detected but not previously documented
+  - `example/lib/screens/model_browser_screen.dart` implementation detected but not previously documented
+  - `example/lib/screens/rag_chat_screen.dart` implementation detected but not previously documented
+  - `example/lib/services/asr_service_wrapper.dart` implementation detected but not previously documented
+  - `example/lib/services/llm_service.dart` implementation detected but not previously documented
+  - `example/lib/services/rag_service.dart` implementation detected but not previously documented
+  - `example/lib/theme/app_theme.dart` implementation detected but not previously documented
+  - `example/lib/utils/app_colors.dart` implementation detected but not previously documented
+  - `example/lib/utils/color_utils.dart` implementation detected but not previously documented
+  - `example/lib/utils/formatters.dart` implementation detected but not previously documented
+  - `example/lib/utils/logger.dart` implementation detected but not previously documented
+  - `example/lib/widgets/cards/device_info_card.dart` implementation detected but not previously documented
+  - `example/lib/widgets/cards/file_card.dart` implementation detected but not previously documented
+  - `example/lib/widgets/cards/local_model_card.dart` implementation detected but not previously documented
+  - `example/lib/widgets/cards/model_card.dart` implementation detected but not previously documented
+  - `example/lib/widgets/cards/recommended_model_card.dart` implementation detected but not previously documented
+  - `example/lib/widgets/chat/chat_bubble.dart` implementation detected but not previously documented
+  - `example/lib/widgets/chat/chat_input.dart` implementation detected but not previously documented
+  - `example/lib/widgets/chat/chat_settings_dialog.dart` implementation detected but not previously documented
+  - `example/lib/widgets/chat/input_suggestions.dart` implementation detected but not previously documented
+  - `example/lib/widgets/chat/message_actions.dart` implementation detected but not previously documented
+  - `example/lib/widgets/chat/typing_indicator.dart` implementation detected but not previously documented
+
 ## 2026-03-06 20:32:38 UTC - Xyla Run 582f9489-b7a0-44ac-a33d-1fdc27221242
 - Base branch: `main`
 - Dependency/analysis summary: Analyzed 48 files for documentation coverage, found 25 potential issues
