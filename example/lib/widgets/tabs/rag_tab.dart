@@ -9,10 +9,10 @@ import '../common/empty_state.dart';
 class RagTab extends StatefulWidget {
   final LLMService llmService;
 
-  const RagTab({Key? key, required this.llmService}) : super(key: key);
+  const RagTab({super.key, required this.llmService});
 
   @override
-  _RagTabState createState() => _RagTabState();
+  State<RagTab> createState() => _RagTabState();
 }
 
 class _RagTabState extends State<RagTab> {
@@ -47,7 +47,7 @@ class _RagTabState extends State<RagTab> {
             action: ElevatedButton.icon(
               onPressed: () {
                 // Switch to search tab
-                DefaultTabController.of(context)?.animateTo(0);
+                DefaultTabController.of(context).animateTo(0);
               },
               icon: const Icon(Icons.download_rounded, size: 16),
               label: const Text(

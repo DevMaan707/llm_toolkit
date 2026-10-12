@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:llm_toolkit/src/core/rag/models/rag_models.dart';
+import 'package:llm_toolkit/llm_toolkit.dart';
 import '../services/rag_service.dart';
 import '../models/app_models.dart';
 import '../widgets/chat/typing_indicator.dart';
@@ -8,10 +8,10 @@ import '../widgets/chat/typing_indicator.dart';
 class RagChatScreen extends StatefulWidget {
   final RagService ragService;
 
-  const RagChatScreen({Key? key, required this.ragService}) : super(key: key);
+  const RagChatScreen({super.key, required this.ragService});
 
   @override
-  _RagChatScreenState createState() => _RagChatScreenState();
+  State<RagChatScreen> createState() => _RagChatScreenState();
 }
 
 class _RagChatScreenState extends State<RagChatScreen>
@@ -90,7 +90,7 @@ class _RagChatScreenState extends State<RagChatScreen>
       leading: Container(
         margin: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.1),
+          color: Colors.white.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(8),
         ),
         child: IconButton(
@@ -108,7 +108,7 @@ class _RagChatScreenState extends State<RagChatScreen>
           Container(
             padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.15),
+              color: Colors.white.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(8),
             ),
             child: const Icon(
@@ -143,7 +143,7 @@ class _RagChatScreenState extends State<RagChatScreen>
         Container(
           margin: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.1),
+            color: Colors.white.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(8),
           ),
           child: IconButton(
@@ -386,7 +386,7 @@ class _RagChatScreenState extends State<RagChatScreen>
                               : Border.all(color: Colors.grey.shade200),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.08),
+                          color: Colors.black.withValues(alpha: 0.08),
                           blurRadius: 8,
                           offset: const Offset(0, 2),
                         ),
@@ -417,7 +417,7 @@ class _RagChatScreenState extends State<RagChatScreen>
                               style: TextStyle(
                                 color:
                                     message.isUser
-                                        ? Colors.white.withOpacity(0.7)
+                                        ? Colors.white.withValues(alpha: 0.7)
                                         : Colors.grey.shade500,
                                 fontSize: 11,
                               ),
@@ -427,7 +427,7 @@ class _RagChatScreenState extends State<RagChatScreen>
                               Icon(
                                 Icons.done_all_rounded,
                                 size: 12,
-                                color: Colors.white.withOpacity(0.7),
+                                color: Colors.white.withValues(alpha: 0.7),
                               ),
                             ],
                           ],
@@ -464,7 +464,7 @@ class _RagChatScreenState extends State<RagChatScreen>
         shape: BoxShape.circle,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -522,7 +522,7 @@ class _RagChatScreenState extends State<RagChatScreen>
     );
   }
 
-  Widget _buildSourcesSection(List<DocumentChunk> chunks) {
+  Widget _buildSourcesSection(List<RetrievedChunk> chunks) {
     return Container(
       margin: const EdgeInsets.only(left: 44),
       padding: const EdgeInsets.all(12),
@@ -584,9 +584,10 @@ class _RagChatScreenState extends State<RagChatScreen>
     );
   }
 
-  Widget _buildSourceItem(DocumentChunk chunk) {
-    final fileName = chunk.metadata?['fileName'] ?? 'Unknown Document';
-    final relevanceScore = chunk.relevanceScore ?? 0.0;
+  Widget _buildSourceItem(RetrievedChunk chunk) {
+    final fileName =
+        chunk.metadata['fileName'] as String? ?? 'Unknown Document';
+    final relevanceScore = chunk.score;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 6),
@@ -644,7 +645,7 @@ class _RagChatScreenState extends State<RagChatScreen>
         border: Border(top: BorderSide(color: Colors.grey.shade200, width: 1)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, -2),
           ),
@@ -697,7 +698,7 @@ class _RagChatScreenState extends State<RagChatScreen>
                   _hasText && !_isGenerating
                       ? [
                         BoxShadow(
-                          color: Colors.purple.withOpacity(0.3),
+                          color: Colors.purple.withValues(alpha: 0.3),
                           blurRadius: 8,
                           offset: const Offset(0, 2),
                         ),
@@ -743,19 +744,12 @@ class _RagChatScreenState extends State<RagChatScreen>
     _scrollToBottom();
 
     try {
-      final config = RagConfig(
-        maxRelevantChunks: 5,
-        similarityThreshold: 0.5,
-        maxTokens: 1000,
-        temperature: 0.7,
-      );
-
-      final response = await widget.ragService.queryRAG(text, config: config);
+      final response = await widget.ragService.queryRAG(text);
 
       final aiMessage = RagChatMessage(
         text: response.answer,
         isUser: false,
-        relevantChunks: response.relevantChunks,
+        relevantChunks: response.sources,
         confidence: response.confidence,
       );
 
@@ -795,7 +789,7 @@ class _RagChatScreenState extends State<RagChatScreen>
     });
   }
 
-  void _showAllSources(List<DocumentChunk> chunks) {
+  void _showAllSources(List<RetrievedChunk> chunks) {
     showDialog(
       context: context,
       builder:
@@ -835,8 +829,8 @@ class _RagChatScreenState extends State<RagChatScreen>
                       itemBuilder: (context, index) {
                         final chunk = chunks[index];
                         final fileName =
-                            chunk.metadata?['fileName'] ?? 'Unknown';
-                        final relevanceScore = chunk.relevanceScore ?? 0.0;
+                            chunk.metadata['fileName'] as String? ?? 'Unknown';
+                        final relevanceScore = chunk.score;
 
                         return Card(
                           margin: const EdgeInsets.only(bottom: 12),
@@ -893,7 +887,7 @@ class _RagChatScreenState extends State<RagChatScreen>
                                     ),
                                   ),
                                   child: Text(
-                                    chunk.content,
+                                    chunk.text,
                                     style: TextStyle(
                                       fontSize: 12,
                                       color: Colors.grey.shade700,
@@ -1060,7 +1054,7 @@ class _RagChatScreenState extends State<RagChatScreen>
   ${message.text}
 
   ${message.relevantChunks.isNotEmpty ? '\nSources:' : ''}
-  ${message.relevantChunks.map((chunk) => '• ${chunk.metadata?['fileName'] ?? 'Unknown'}').join('\n')}
+  ${message.relevantChunks.map((chunk) => '• ${chunk.metadata['fileName'] ?? 'Unknown'}').join('\n')}
 
   Generated at: ${_formatTime(message.timestamp)}
   Confidence: ${message.confidence != null ? '${(message.confidence! * 100).toInt()}%' : 'N/A'}
@@ -1135,11 +1129,11 @@ class _RagChatScreenState extends State<RagChatScreen>
           (msg) => '''
   ${msg.isUser ? 'You' : 'RAG Assistant'}: ${msg.text}
   ${!msg.isUser && msg.confidence != null ? 'Confidence: ${(msg.confidence! * 100).toInt()}%' : ''}
-  ${!msg.isUser && msg.relevantChunks.isNotEmpty ? 'Sources: ${msg.relevantChunks.map((c) => c.metadata?['fileName'] ?? 'Unknown').join(', ')}' : ''}
+  ${!msg.isUser && msg.relevantChunks.isNotEmpty ? 'Sources: ${msg.relevantChunks.map((c) => c.metadata['fileName'] ?? 'Unknown').join(', ')}' : ''}
   Time: ${_formatTime(msg.timestamp)}
   ''',
         )
-        .join('\n' + '=' * 50 + '\n');
+        .join('\n${'=' * 50}\n');
 
     final fullExport = '''
   RAG Chat Export
@@ -1180,16 +1174,16 @@ class _RagChatScreenState extends State<RagChatScreen>
 }
 
 // RAG Chat Message model
-class RagChatMessage extends ChatMessage {
-  final List<DocumentChunk> relevantChunks;
+class RagChatMessage extends UiMessage {
+  final List<RetrievedChunk> relevantChunks;
   final double? confidence;
 
   RagChatMessage({
-    required String text,
-    required bool isUser,
+    required super.text,
+    required super.isUser,
     required this.relevantChunks,
     this.confidence,
-    DateTime? timestamp,
-    String? error,
-  }) : super(text: text, isUser: isUser, timestamp: timestamp, error: error);
+    super.timestamp,
+    super.error,
+  });
 }

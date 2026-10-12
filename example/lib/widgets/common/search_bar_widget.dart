@@ -7,12 +7,12 @@ class SearchBarWidget extends StatelessWidget {
   final String hintText;
 
   const SearchBarWidget({
-    Key? key,
+    super.key,
     required this.controller,
     required this.onSearch,
     required this.onClear,
     this.hintText = 'Search models (GGUF, TFLite, gemma, llama, phi)...',
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -21,7 +21,7 @@ class SearchBarWidget extends StatelessWidget {
         borderRadius: BorderRadius.circular(10),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 6,
             offset: const Offset(0, 2),
           ),

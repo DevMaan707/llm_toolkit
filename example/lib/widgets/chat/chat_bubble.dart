@@ -2,12 +2,16 @@ import 'package:flutter/material.dart';
 import '../../models/app_models.dart';
 
 class ChatBubble extends StatelessWidget {
-  final ChatMessage message;
+  final UiMessage message;
   final VoidCallback? onCopy;
   final VoidCallback? onShare;
 
-  const ChatBubble({Key? key, required this.message, this.onCopy, this.onShare})
-    : super(key: key);
+  const ChatBubble({
+    super.key,
+    required this.message,
+    this.onCopy,
+    this.onShare,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -59,7 +63,7 @@ class ChatBubble extends StatelessWidget {
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.06),
+                      color: Colors.black.withValues(alpha: 0.06),
                       blurRadius: 4,
                       offset: const Offset(0, 1),
                     ),
@@ -90,7 +94,7 @@ class ChatBubble extends StatelessWidget {
                           style: TextStyle(
                             color:
                                 message.isUser
-                                    ? Colors.white.withOpacity(0.7)
+                                    ? Colors.white.withValues(alpha: 0.7)
                                     : Colors.grey.shade500,
                             fontSize: 9,
                           ),
@@ -100,7 +104,7 @@ class ChatBubble extends StatelessWidget {
                           Icon(
                             Icons.done_all_rounded,
                             size: 10,
-                            color: Colors.white.withOpacity(0.7),
+                            color: Colors.white.withValues(alpha: 0.7),
                           ),
                         ],
                       ],
@@ -133,7 +137,7 @@ class ChatBubble extends StatelessWidget {
         shape: BoxShape.circle,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 2,
             offset: const Offset(0, 1),
           ),

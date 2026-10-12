@@ -7,7 +7,7 @@ import '../common/empty_state.dart';
 class DownloadedTab extends StatelessWidget {
   final LLMService llmService;
 
-  const DownloadedTab({Key? key, required this.llmService}) : super(key: key);
+  const DownloadedTab({super.key, required this.llmService});
 
   @override
   Widget build(BuildContext context) {

@@ -7,13 +7,13 @@ class RagSetupSection extends StatefulWidget {
   final List<LocalModel> availableModels;
 
   const RagSetupSection({
-    Key? key,
+    super.key,
     required this.ragService,
     required this.availableModels,
-  }) : super(key: key);
+  });
 
   @override
-  _RagSetupSectionState createState() => _RagSetupSectionState();
+  State<RagSetupSection> createState() => _RagSetupSectionState();
 }
 
 class _RagSetupSectionState extends State<RagSetupSection> {
@@ -156,7 +156,7 @@ class _RagSetupSectionState extends State<RagSetupSection> {
           ),
           const SizedBox(height: 8),
           DropdownButtonFormField<String>(
-            value: selectedValue,
+            initialValue: selectedValue,
             onChanged: onChanged,
             decoration: InputDecoration(
               contentPadding: const EdgeInsets.symmetric(

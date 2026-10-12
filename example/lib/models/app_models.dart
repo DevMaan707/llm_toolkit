@@ -1,11 +1,9 @@
-import 'package:llm_toolkit/llm_toolkit.dart';
-
 class LocalModel {
   final String name;
   final String path;
   final String size;
   final DateTime lastModified;
-  final InferenceEngineType engine;
+  final String engine;
 
   LocalModel({
     required this.name,
@@ -22,7 +20,7 @@ class RecommendedModel {
   final String searchTerm;
   final String quantization;
   final String size;
-  final InferenceEngineType engine;
+  final String engine;
   final String category;
   final bool isStable;
   final List<String> features;
@@ -42,13 +40,13 @@ class RecommendedModel {
   });
 }
 
-class ChatMessage {
+class UiMessage {
   String text;
   final bool isUser;
   final DateTime timestamp;
   String? error;
 
-  ChatMessage({
+  UiMessage({
     required this.text,
     required this.isUser,
     DateTime? timestamp,

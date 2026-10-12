@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:llm_toolkit/llm_toolkit.dart';
 import '../../models/app_models.dart';
 import '../../services/llm_service.dart';
 import '../../utils/formatters.dart';
@@ -9,10 +8,10 @@ class LocalModelCard extends StatelessWidget {
   final LLMService llmService;
 
   const LocalModelCard({
-    Key? key,
+    super.key,
     required this.model,
     required this.llmService,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -30,8 +29,9 @@ class LocalModelCard extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: (isCurrentlyLoaded ? Colors.green : Colors.black)
-                .withOpacity(0.04),
+            color: (isCurrentlyLoaded ? Colors.green : Colors.black).withValues(
+              alpha: 0.04,
+            ),
             blurRadius: isCurrentlyLoaded ? 8 : 4,
             offset: const Offset(0, 2),
           ),
@@ -62,7 +62,7 @@ class LocalModelCard extends StatelessWidget {
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors:
-                  model.engine == InferenceEngineType.gemma
+                  model.engine == 'litert'
                       ? [Colors.blue.shade400, Colors.blue.shade600]
                       : [Colors.green.shade400, Colors.green.shade600],
               begin: Alignment.topLeft,
@@ -71,17 +71,15 @@ class LocalModelCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(10),
             boxShadow: [
               BoxShadow(
-                color: (model.engine == InferenceEngineType.gemma
-                        ? Colors.blue
-                        : Colors.green)
-                    .withOpacity(0.2),
+                color: (model.engine == 'litert' ? Colors.blue : Colors.green)
+                    .withValues(alpha: 0.2),
                 blurRadius: 4,
                 offset: const Offset(0, 2),
               ),
             ],
           ),
           child: Icon(
-            model.engine == InferenceEngineType.gemma
+            model.engine == 'litert'
                 ? Icons.psychology_rounded
                 : Icons.memory_rounded,
             color: Colors.white,
@@ -137,14 +135,14 @@ class LocalModelCard extends StatelessWidget {
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors:
-              model.engine == InferenceEngineType.gemma
+              model.engine == 'litert'
                   ? [Colors.blue.shade50, Colors.blue.shade100]
                   : [Colors.green.shade50, Colors.green.shade100],
         ),
         borderRadius: BorderRadius.circular(6),
         border: Border.all(
           color:
-              model.engine == InferenceEngineType.gemma
+              model.engine == 'litert'
                   ? Colors.blue.shade200
                   : Colors.green.shade200,
         ),
@@ -153,23 +151,23 @@ class LocalModelCard extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
-            model.engine == InferenceEngineType.gemma
+            model.engine == 'litert'
                 ? Icons.psychology_rounded
                 : Icons.memory_rounded,
             size: 10,
             color:
-                model.engine == InferenceEngineType.gemma
+                model.engine == 'litert'
                     ? Colors.blue.shade700
                     : Colors.green.shade700,
           ),
           const SizedBox(width: 3),
           Text(
-            '${model.engine.name.toUpperCase()} Engine',
+            '${model.engine.toUpperCase()} Engine',
             style: TextStyle(
               fontSize: 8,
               fontWeight: FontWeight.bold,
               color:
-                  model.engine == InferenceEngineType.gemma
+                  model.engine == 'litert'
                       ? Colors.blue.shade700
                       : Colors.green.shade700,
             ),

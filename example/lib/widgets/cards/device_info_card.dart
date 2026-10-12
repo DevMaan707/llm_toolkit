@@ -4,7 +4,7 @@ import '../../models/app_models.dart';
 class DeviceInfoCard extends StatelessWidget {
   final DeviceInfo deviceInfo;
 
-  const DeviceInfoCard({Key? key, required this.deviceInfo}) : super(key: key);
+  const DeviceInfoCard({super.key, required this.deviceInfo});
 
   @override
   Widget build(BuildContext context) {

@@ -1,15 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:llm_toolkit/llm_toolkit.dart';
+
 import '../models/app_models.dart';
 import '../utils/logger.dart';
-import 'package:llm_toolkit/src/services/asr_service.dart';
-import 'dart:async';
-import 'dart:typed_data';
-import 'dart:io';
-import 'package:record/record.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:llm_toolkit/src/core/inference/tflite_asr_engine.dart'
-    as tflite;
 
 class ASRServiceWrapper extends ChangeNotifier {
   final AppLogger _logger = AppLogger();
@@ -23,10 +18,6 @@ class ASRServiceWrapper extends ChangeNotifier {
   String? _selectedModelName;
   String _transcriptionResult = '';
 
-  // Audio streaming components
-  final AudioRecorder _audioRecorder = AudioRecorder();
-  StreamSubscription<String>? _streamingSubscription;
-  Timer? _chunkTimer;
   bool _shouldStopStreaming = false;
 
   // Getters
@@ -45,9 +36,9 @@ class ASRServiceWrapper extends ChangeNotifier {
     _setProcessing(true);
 
     try {
-      _asrService = ASRService();
-      final config = ASRConfig.mobile();
-      await _asrService!.initialize(modelPath, config: config);
+      await _asrService?.dispose();
+      _asrService = ASRService(config: const ASRConfig.mobile());
+      await _asrService!.initialize(modelPath);
 
       _selectedModelPath = modelPath;
       _selectedModelName = modelName;
@@ -139,7 +130,7 @@ class ASRServiceWrapper extends ChangeNotifier {
     }
   }
 
-  /// Start live streaming transcription - FIXED VERSION
+  /// Start live streaming transcription
   Stream<String> startStreamingTranscription() async* {
     if (!_isInitialized || _asrService == null) {
       throw Exception('ASR service not initialized');
@@ -153,17 +144,11 @@ class ASRServiceWrapper extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Check microphone permission first
-      final hasPermission = await _audioRecorder.hasPermission();
-      if (!hasPermission) {
-        throw Exception('Microphone permission not granted');
-      }
-
       // Use the ASR service's streaming method
       await for (final chunk in _asrService!.startStreamingTranscription()) {
         if (_shouldStopStreaming) break;
 
-        _transcriptionResult += chunk + " ";
+        _transcriptionResult += '$chunk ';
         notifyListeners();
         yield chunk;
       }
@@ -177,15 +162,11 @@ class ASRServiceWrapper extends ChangeNotifier {
     }
   }
 
-  /// Stop streaming transcription - FIXED VERSION
+  /// Stop streaming transcription
   Future<void> stopStreamingTranscription() async {
     _logger.info('🎤 Stopping streaming transcription...');
 
     _shouldStopStreaming = true;
-
-    // Cancel any existing subscription
-    await _streamingSubscription?.cancel();
-    _streamingSubscription = null;
 
     // Stop the ASR service streaming
     if (_asrService != null) {
@@ -206,7 +187,14 @@ class ASRServiceWrapper extends ChangeNotifier {
   /// Test microphone access
   Future<bool> testMicrophoneAccess() async {
     try {
-      return await _audioRecorder.hasPermission();
+      final service = _asrService;
+      if (service != null) return await service.testMicrophoneAccess();
+      final probe = ASRService();
+      try {
+        return await probe.testMicrophoneAccess();
+      } finally {
+        await probe.dispose();
+      }
     } catch (e) {
       _logger.error('❌ Microphone test failed', e);
       return false;
@@ -234,9 +222,6 @@ class ASRServiceWrapper extends ChangeNotifier {
   @override
   void dispose() {
     _shouldStopStreaming = true;
-    _chunkTimer?.cancel();
-    _streamingSubscription?.cancel();
-    _audioRecorder.dispose();
     _asrService?.dispose();
     _logger.dispose();
     super.dispose();

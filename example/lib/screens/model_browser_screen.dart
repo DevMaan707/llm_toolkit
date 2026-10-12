@@ -12,8 +12,10 @@ import '../services/asr_service_wrapper.dart';
 import '../widgets/tabs/asr_tab.dart';
 
 class ModelBrowserScreen extends StatefulWidget {
+  const ModelBrowserScreen({super.key});
+
   @override
-  _ModelBrowserScreenState createState() => _ModelBrowserScreenState();
+  State<ModelBrowserScreen> createState() => _ModelBrowserScreenState();
 }
 
 class _ModelBrowserScreenState extends State<ModelBrowserScreen>

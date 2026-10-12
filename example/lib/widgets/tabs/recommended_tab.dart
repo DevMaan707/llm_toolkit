@@ -6,7 +6,7 @@ import '../cards/recommended_model_card.dart';
 class RecommendedTab extends StatelessWidget {
   final LLMService llmService;
 
-  const RecommendedTab({Key? key, required this.llmService}) : super(key: key);
+  const RecommendedTab({super.key, required this.llmService});
 
   @override
   Widget build(BuildContext context) {
@@ -68,7 +68,7 @@ class RecommendedTab extends StatelessWidget {
                   const SizedBox(height: 16),
                 ],
               );
-            }).toList(),
+            }),
           ],
         );
       },

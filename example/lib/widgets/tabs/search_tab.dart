@@ -8,10 +8,10 @@ import '../common/empty_state.dart';
 class SearchTab extends StatefulWidget {
   final LLMService llmService;
 
-  const SearchTab({Key? key, required this.llmService}) : super(key: key);
+  const SearchTab({super.key, required this.llmService});
 
   @override
-  _SearchTabState createState() => _SearchTabState();
+  State<SearchTab> createState() => _SearchTabState();
 }
 
 class _SearchTabState extends State<SearchTab> {

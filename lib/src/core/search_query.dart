@@ -1,29 +1,67 @@
-class SearchQuery {
-  final String searchTerm;
-  final List<ModelFormat> formats;
-  final List<TaskType> tasks;
-  final int limit;
-  final bool onlyCompatible;
-  final int? maxSizeBytes;
-  final SortBy sortBy;
-  final SortDirection sortDirection;
+import 'model_info.dart';
 
-  SearchQuery({
-    required this.searchTerm,
-    this.formats = const [],
-    this.tasks = const [],
-    this.limit = 20,
-    this.onlyCompatible = true,
-    this.maxSizeBytes,
-    this.sortBy = SortBy.downloads,
-    this.sortDirection = SortDirection.desc,
-  });
+/// Result ordering supported by the Hugging Face Hub.
+enum ModelSort {
+  downloads('downloads'),
+  likes('likes'),
+  lastModified('lastModified'),
+  createdAt('createdAt'),
+  trending('trendingScore');
+
+  const ModelSort(this.apiValue);
+
+  /// Value of the Hub's `sort` query parameter.
+  final String apiValue;
 }
 
-enum ModelFormat { gguf, ggml, safetensors, pytorch }
+/// Common Hub `pipeline_tag` values.
+abstract final class PipelineTags {
+  static const textGeneration = 'text-generation';
+  static const imageTextToText = 'image-text-to-text';
+  static const featureExtraction = 'feature-extraction';
+  static const speechRecognition = 'automatic-speech-recognition';
+  static const textToSpeech = 'text-to-speech';
+}
 
-enum TaskType { textGeneration, chatbot, codeGeneration, translation }
+/// Parameters of a model search.
+class SearchQuery {
+  final String text;
 
-enum SortBy { downloads, created, updated, name }
+  /// Only models that ship one of these formats; empty means any.
+  final Set<ModelFormat> formats;
 
-enum SortDirection { asc, desc }
+  /// Hub `pipeline_tag` values; a model matches any of them.
+  final Set<String> pipelineTags;
+
+  /// Hub library tag such as `transformers`.
+  final String? library;
+  final String? author;
+
+  /// Drops files larger than this and models left without files.
+  final int? maxSizeBytes;
+  final int? minDownloads;
+  final int limit;
+  final ModelSort sort;
+  final bool descending;
+
+  /// Keep only models with at least one file the toolkit can run.
+  final bool onlyRunnable;
+
+  /// Fetch per-file sizes and hashes (one extra request per result).
+  final bool includeFileSizes;
+
+  const SearchQuery({
+    this.text = '',
+    this.formats = const {},
+    this.pipelineTags = const {},
+    this.library,
+    this.author,
+    this.maxSizeBytes,
+    this.minDownloads,
+    this.limit = 20,
+    this.sort = ModelSort.downloads,
+    this.descending = true,
+    this.onlyRunnable = true,
+    this.includeFileSizes = true,
+  }) : assert(limit > 0, 'limit must be positive');
+}

@@ -1,6 +1,6 @@
 name: llm_toolkit
-description: "A comprehensive Flutter SDK for running Large Language Models (LLMs) locally on mobile and desktop devices. Supports multiple inference engines including Gemma (TFLite) and Llama (GGUF) with integrated model discovery, download, and chat capabilities."
-version: 0.0.4
+description: "On-device AI toolkit for Flutter: LLM chat (GGUF via llama.cpp, LiteRT-LM), vision, Whisper speech recognition, embeddings and RAG, Hugging Face/Ollama model discovery and resumable downloads, structured output and tool calling."
+version: 0.1.0
 homepage: https://github.com/DevMaan707/llm_toolkit
 
 environment:
@@ -8,31 +8,31 @@ environment:
   flutter: ">=1.17.0"
 
 dependencies:
-  llama_cpp_dart: ^0.0.9
-  flutter_gemma: ^0.9.0
-  tflite_flutter: ^0.11.0
-  dio: ^5.8.0
-  http: ^1.1.0
-  path_provider: ^2.1.1
-  #tflite_text_classification: ^0.0.2
-  record: ^6.0.0
+  flutter:
+    sdk: flutter
+
+  # Inference engines
+  llama_cpp_dart: ^0.2.2
+  flutter_edge_ai: ^2.3.1
+  flutter_edge_ai_litertlm: ^1.13.1
+  tflite_flutter: ^0.12.1
+
+  # Audio
+  record: ^7.1.2
   fftea: ^1.0.0
 
-  objectbox: ^4.3.0
-  objectbox_flutter_libs: ^4.3.0
-
+  # Networking, storage and utilities
+  dio: ^5.8.0
+  http: ^1.5.0
+  path_provider: ^2.1.1
   path: ^1.8.3
   crypto: ^3.0.3
   collection: ^1.17.0
 
-  json_annotation: ^4.8.1
-  flutter:
-    sdk: flutter
-
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^5.0.0
+  flutter_lints: ^6.0.0
 
 flutter:
   uses-material-design: true

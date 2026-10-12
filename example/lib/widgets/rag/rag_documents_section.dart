@@ -5,8 +5,7 @@ import '../../utils/formatters.dart';
 class RagDocumentsSection extends StatelessWidget {
   final RagService ragService;
 
-  const RagDocumentsSection({Key? key, required this.ragService})
-    : super(key: key);
+  const RagDocumentsSection({super.key, required this.ragService});
 
   @override
   Widget build(BuildContext context) {
@@ -189,7 +188,7 @@ class RagDocumentsSection extends StatelessWidget {
     );
   }
 
-  Widget _buildDocumentTile(RagDocument doc, BuildContext context) {
+  Widget _buildDocumentTile(IndexedDocument doc, BuildContext context) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       padding: const EdgeInsets.all(12),
@@ -370,7 +369,7 @@ class RagDocumentsSection extends StatelessWidget {
     }
   }
 
-  void _removeDocument(RagDocument doc, BuildContext context) {
+  void _removeDocument(IndexedDocument doc, BuildContext context) {
     showDialog(
       context: context,
       builder:

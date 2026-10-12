@@ -9,11 +9,10 @@ class AsrTab extends StatefulWidget {
   final LLMService llmService;
   final ASRServiceWrapper asrService;
 
-  const AsrTab({Key? key, required this.llmService, required this.asrService})
-    : super(key: key);
+  const AsrTab({super.key, required this.llmService, required this.asrService});
 
   @override
-  _AsrTabState createState() => _AsrTabState();
+  State<AsrTab> createState() => _AsrTabState();
 }
 
 class _AsrTabState extends State<AsrTab> {
@@ -42,7 +41,7 @@ class _AsrTabState extends State<AsrTab> {
             subtitle: 'Download TFLite models first to use ASR functionality',
             action: ElevatedButton.icon(
               onPressed: () {
-                DefaultTabController.of(context)?.animateTo(0);
+                DefaultTabController.of(context).animateTo(0);
               },
               icon: const Icon(Icons.download_rounded, size: 16),
               label: const Text(
@@ -186,7 +185,7 @@ class _AsrTabState extends State<AsrTab> {
           ),
           const SizedBox(height: 8),
           DropdownButtonFormField<String>(
-            value: _selectedModelPath,
+            initialValue: _selectedModelPath,
             onChanged: (value) => setState(() => _selectedModelPath = value),
             decoration: InputDecoration(
               contentPadding: const EdgeInsets.symmetric(
@@ -448,9 +447,9 @@ class _AsrTabState extends State<AsrTab> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: statusColor.withOpacity(0.1),
+        color: statusColor.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: statusColor.withOpacity(0.3)),
+        border: Border.all(color: statusColor.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
@@ -761,7 +760,6 @@ class _AsrTabState extends State<AsrTab> {
               (chunk) {
                 // The transcription result is already updated in the service
                 // Just show a brief notification for each chunk if needed
-                print('Received chunk: $chunk');
               },
               onError: (error) {
                 if (mounted) {
@@ -778,7 +776,6 @@ class _AsrTabState extends State<AsrTab> {
                 }
               },
               onDone: () {
-                print('Streaming completed');
                 _streamingSubscription = null;
               },
             );

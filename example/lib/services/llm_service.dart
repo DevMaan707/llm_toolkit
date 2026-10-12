@@ -1,15 +1,16 @@
 import 'dart:async';
 
+import 'dart:io';
+
+import 'package:device_info_plus/device_info_plus.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:llm_toolkit/llm_toolkit.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:device_info_plus/device_info_plus.dart';
-import 'package:file_picker/file_picker.dart';
-import 'dart:io';
+
+import '../data/recommended_models.dart';
 import '../models/app_models.dart';
 import '../utils/logger.dart';
-import '../data/recommended_models.dart';
-import 'package:llm_toolkit/src/core/inference/llama_engine.dart';
 
 class LLMService extends ChangeNotifier {
   final AppLogger _logger = AppLogger();
@@ -20,7 +21,8 @@ class LLMService extends ChangeNotifier {
   List<RecommendedModel> _recommendedModels = [];
   String? _loadedModelPath;
   String? _selectedModelName;
-  InferenceEngineType? _activeEngine;
+  String? _activeEngine;
+  ChatSession? _chat;
   final Map<String, double> _downloadProgress = {};
   final Map<String, bool> _isDownloading = {};
   final Set<String> _downloadedModelFiles = {};
@@ -28,8 +30,6 @@ class LLMService extends ChangeNotifier {
   bool _isLoading = false;
   bool _isSearching = false;
   String _lastSearchQuery = '';
-  StreamController<String>? _textGenerationController;
-  StreamSubscription<String>? _currentGenerationSubscription;
 
   // Getters
   List<ModelInfo> get searchModels => _searchModels;
@@ -37,7 +37,9 @@ class LLMService extends ChangeNotifier {
   List<RecommendedModel> get recommendedModels => _recommendedModels;
   String? get loadedModelPath => _loadedModelPath;
   String? get selectedModelName => _selectedModelName;
-  InferenceEngineType? get activeEngine => _activeEngine;
+  String? get activeEngine => _activeEngine;
+  Set<ModelCapability> get capabilities => LLMToolkit.instance.capabilities;
+  ChatUsage? get lastUsage => _chat?.lastUsage;
   Map<String, double> get downloadProgress => _downloadProgress;
   Map<String, bool> get isDownloading => _isDownloading;
   Set<String> get downloadedModelFiles => _downloadedModelFiles;
@@ -52,7 +54,7 @@ class LLMService extends ChangeNotifier {
     try {
       LLMToolkit.instance.initialize(
         huggingFaceApiKey: '..',
-        defaultConfig: InferenceConfig.mobile(),
+        defaultConfig: const InferenceConfig.mobile(),
       );
 
       await _loadDeviceInfo();
@@ -63,7 +65,7 @@ class LLMService extends ChangeNotifier {
       _logger.success('✅ LLM Service initialized successfully');
     } catch (e, stackTrace) {
       _logger.error('❌ Failed to initialize LLM Service', e);
-      debugPrint('Stack trace: $stackTrace');
+      ToolkitLog.error('LLMService', 'Initialization failed', e, stackTrace);
     }
   }
 
@@ -190,7 +192,7 @@ class LLMService extends ChangeNotifier {
     try {
       FilePickerResult? result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['gguf', 'tflite'],
+        allowedExtensions: ['gguf', 'tflite', 'litertlm', 'task'],
         allowMultiple: false,
       );
 
@@ -229,6 +231,7 @@ class LLMService extends ChangeNotifier {
         _loadedModelPath = null;
         _selectedModelName = null;
         _activeEngine = null;
+        _chat = null;
         notifyListeners();
       }
       _logger.success('✅ Model deleted successfully');
@@ -244,60 +247,23 @@ class LLMService extends ChangeNotifier {
     return _downloadedModelFiles.contains(expectedFileName);
   }
 
-  Stream<String> generateText(String prompt, {GenerationParams? params}) {
-    if (!hasLoadedModel) {
-      throw Exception('No model loaded');
-    }
-
-    _logger.info(
-      '💬 Generating text for prompt: "${prompt.substring(0, prompt.length > 50 ? 50 : prompt.length)}..."',
-    );
-
-    // Cancel any existing generation
-    _currentGenerationSubscription?.cancel();
-    _textGenerationController?.close();
-
-    // Create a new stream controller for this generation
-    _textGenerationController = StreamController<String>.broadcast();
-
-    // Get the stream from LLMToolkit and forward it to our controller
-    final toolkitStream = LLMToolkit.instance.generateText(
-      prompt,
-      params: params ?? GenerationParams.longForm(),
-    );
-
-    _currentGenerationSubscription = toolkitStream.listen(
-      (token) {
-        if (!_textGenerationController!.isClosed) {
-          _textGenerationController!.add(token);
-        }
-      },
-      onDone: () {
-        if (!_textGenerationController!.isClosed) {
-          _textGenerationController!.close();
-        }
-      },
-      onError: (error) {
-        if (!_textGenerationController!.isClosed) {
-          _textGenerationController!.addError(error);
-        }
-      },
-      cancelOnError: true,
-    );
-
-    return _textGenerationController!.stream;
+  /// Sends [text] to the chat session and streams the reply.
+  Stream<String> sendMessage(String text) {
+    final chat = _chat;
+    if (chat == null) throw Exception('No model loaded');
+    _logger.info('💬 Sending message (${text.length} chars)');
+    return chat.send(text);
   }
 
   void stopGeneration() {
     _logger.info('🛑 Stopping text generation...');
-    _currentGenerationSubscription?.cancel();
-    _currentGenerationSubscription = null;
+    _chat?.cancel();
+  }
 
-    if (_textGenerationController != null &&
-        !_textGenerationController!.isClosed) {
-      _textGenerationController!.close();
-    }
-    _textGenerationController = null;
+  /// Clears the conversation history of the active chat session.
+  void resetChat() {
+    final chat = _chat;
+    if (chat != null && !chat.isGenerating) chat.reset();
   }
 
   Future<void> loadDownloadedModels() async {
@@ -314,11 +280,11 @@ class LLMService extends ChangeNotifier {
 
         for (final file in files) {
           if (file is File &&
-              (file.path.endsWith('.gguf') || file.path.endsWith('.tflite'))) {
+              (ModelFormat.fromFilename(file.path)?.isRunnable ?? false)) {
             final fileName = file.path.split('/').last;
             final fileSize = await file.length();
             final lastModified = await file.lastModified();
-            final engine = ModelDetector.instance.detectEngine(fileName);
+            final engine = ModelDetector.instance.detect(fileName).engineId;
 
             _downloadedModelFiles.add(fileName);
 
@@ -326,7 +292,7 @@ class LLMService extends ChangeNotifier {
               LocalModel(
                 name: fileName,
                 path: file.path,
-                size: _formatFileSize(fileSize),
+                size: formatBytes(fileSize),
                 lastModified: lastModified,
                 engine: engine,
               ),
@@ -345,34 +311,29 @@ class LLMService extends ChangeNotifier {
 
   Future<void> _loadModelWithConfig(String modelPath, String modelName) async {
     _logger.info('🔧 Configuring model: $modelPath');
+    _isLoading = true;
+    notifyListeners();
 
     try {
-      final engineType = ModelDetector.instance.detectEngine(modelPath);
-      _logger.info('🎯 Detected engine: ${engineType.name}');
+      final detected = ModelDetector.instance.detect(modelPath);
+      _logger.info('🎯 Detected engine: ${detected.engineId}');
 
-      InferenceConfig config;
-      if (engineType == InferenceEngineType.gemma) {
-        final modelType = ModelDetector.instance.detectGemmaModelType(
-          modelPath,
-        );
-        config = InferenceConfig(
-          modelType: modelType,
-          preferredBackend: PreferredBackend.gpu,
-          maxTokens: 4096,
-          supportImage: false,
-          maxNumImages: 1,
-        );
-      } else {
-        final availableMemory = _deviceInfo?.availableMemoryMB ?? 2048;
-        int nCtx = availableMemory < 2048 ? 1024 : 2048;
-        config = InferenceConfig(nCtx: nCtx, verbose: false);
-      }
+      final availableMemory = _deviceInfo?.availableMemoryMB ?? 2048;
+      final config =
+          detected.engineId == 'litert'
+              ? const InferenceConfig(
+                backend: ComputeBackend.gpu,
+                maxTokens: 4096,
+              )
+              : InferenceConfig(
+                contextSize: availableMemory < 2048 ? 1024 : 2048,
+              );
 
-      _logger.info('🚀 Loading model with ${engineType.name} engine...');
       final loadStopwatch = Stopwatch()..start();
-
-      await LLMToolkit.instance.loadModel(modelPath, config: config);
-
+      final engine = await LLMToolkit.instance.loadModel(
+        modelPath,
+        config: config,
+      );
       loadStopwatch.stop();
       _logger.success(
         '✅ Model loaded successfully in ${loadStopwatch.elapsedMilliseconds}ms',
@@ -380,11 +341,22 @@ class LLMService extends ChangeNotifier {
 
       _loadedModelPath = modelPath;
       _selectedModelName = modelName;
-      _activeEngine = LLMToolkit.instance.activeEngine;
+      _activeEngine = engine.id;
+      _chat =
+          engine.capabilities.contains(ModelCapability.textGeneration)
+              ? LLMToolkit.instance.createChat(
+                family: detected.family,
+                params: const GenerationParams.longForm(),
+                contextSize: config.contextSize,
+              )
+              : null;
       notifyListeners();
     } catch (e) {
       _logger.error('❌ Model loading failed', e);
       throw Exception('Failed to load model: $e');
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
   }
 
@@ -440,31 +412,43 @@ class LLMService extends ChangeNotifier {
 
   Future<void> _loadDeviceInfo() async {
     try {
-      final deviceInfoPlugin = DeviceInfoPlugin();
-      final androidInfo = await deviceInfoPlugin.androidInfo;
-      final memoryInfo = await LlamaInferenceEngine.getMemoryInfo();
-      final recommendations =
-          await LlamaInferenceEngine.getModelRecommendations();
+      final androidInfo = await DeviceInfoPlugin().androidInfo;
+      final (totalMb, availableMb) = await _readMemoryMb();
+      final (status, quantization, nCtx) = switch (availableMb) {
+        < 2048 => ('Low memory', 'Q4_K_M or smaller', 1024),
+        < 4096 => ('Moderate memory', 'Q4_K_M', 2048),
+        _ => ('Plenty of memory', 'Q5_K_M or Q8_0', 4096),
+      };
 
       _deviceInfo = DeviceInfo(
         brand: androidInfo.brand,
         model: androidInfo.model,
         version: androidInfo.version.release,
         sdkInt: androidInfo.version.sdkInt,
-        totalMemoryMB: memoryInfo['totalMB'] ?? 0,
-        availableMemoryMB: memoryInfo['availableMB'] ?? 0,
-        memoryStatus: recommendations['memoryStatus'] ?? '',
-        recommendedQuantization:
-            recommendations['recommendedQuantization'] ?? '',
-        recommendedNCtx: recommendations['recommendedNCtx'] ?? 1024,
+        totalMemoryMB: totalMb,
+        availableMemoryMB: availableMb,
+        memoryStatus: status,
+        recommendedQuantization: quantization,
+        recommendedNCtx: nCtx,
       );
 
       _logger.info('📱 Device: ${androidInfo.brand} ${androidInfo.model}');
-      _logger.info('💾 Memory: ${memoryInfo['availableMB']}MB available');
+      _logger.info('💾 Memory: ${availableMb}MB available');
     } catch (e) {
       _logger.error('❌ Failed to load device info', e);
     }
     notifyListeners();
+  }
+
+  /// `(total, available)` memory in MB from `/proc/meminfo`.
+  Future<(int, int)> _readMemoryMb() async {
+    final lines = await File('/proc/meminfo').readAsLines();
+    int kb(String key) {
+      final line = lines.firstWhere((l) => l.startsWith('$key:'));
+      return int.parse(RegExp(r'\d+').firstMatch(line)!.group(0)!);
+    }
+
+    return (kb('MemTotal') ~/ 1024, kb('MemAvailable') ~/ 1024);
   }
 
   void _loadRecommendedModels() {
@@ -473,27 +457,14 @@ class LLMService extends ChangeNotifier {
     notifyListeners();
   }
 
-  String _formatFileSize(int bytes) {
-    if (bytes < 1024) return '${bytes}B';
-    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)}KB';
-    if (bytes < 1024 * 1024 * 1024)
-      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)}MB';
-    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)}GB';
-  }
-
   void _setSearching(bool searching) {
     _isSearching = searching;
     notifyListeners();
   }
 
-  void _setLoading(bool loading) {
-    _isLoading = loading;
-    notifyListeners();
-  }
-
   @override
   void dispose() {
-    _currentGenerationSubscription?.cancel();
+    _chat?.cancel();
     _logger.dispose();
     super.dispose();
   }

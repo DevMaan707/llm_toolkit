@@ -5,10 +5,10 @@ import '../../utils/logger.dart';
 class DebugPanel extends StatefulWidget {
   final LLMService llmService;
 
-  const DebugPanel({Key? key, required this.llmService}) : super(key: key);
+  const DebugPanel({super.key, required this.llmService});
 
   @override
-  _DebugPanelState createState() => _DebugPanelState();
+  State<DebugPanel> createState() => _DebugPanelState();
 }
 
 class _DebugPanelState extends State<DebugPanel> {
@@ -116,19 +116,19 @@ class _DebugPanelState extends State<DebugPanel> {
     IconData icon;
 
     switch (log.level) {
-      case LogLevel.info:
+      case AppLogLevel.info:
         textColor = Colors.blue.shade300;
         icon = Icons.info_outline_rounded;
         break;
-      case LogLevel.success:
+      case AppLogLevel.success:
         textColor = Colors.green.shade300;
         icon = Icons.check_circle_outline_rounded;
         break;
-      case LogLevel.warning:
+      case AppLogLevel.warning:
         textColor = Colors.orange.shade300;
         icon = Icons.warning_amber_rounded;
         break;
-      case LogLevel.error:
+      case AppLogLevel.error:
         textColor = Colors.red.shade300;
         icon = Icons.error_outline_rounded;
         break;

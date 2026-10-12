@@ -30,12 +30,10 @@ class AppTheme {
         primary: primaryBlue,
         secondary: secondaryBlue,
         surface: surfaceWhite,
-        background: surfaceGray,
         error: errorRed,
         onPrimary: Colors.white,
         onSecondary: Colors.white,
         onSurface: textPrimary,
-        onBackground: textPrimary,
       ),
 
       // Compact AppBar theme
@@ -57,7 +55,7 @@ class AppTheme {
         elevation: 0,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         color: Colors.white,
-        shadowColor: Colors.black.withOpacity(0.06),
+        shadowColor: Colors.black.withValues(alpha: 0.06),
         surfaceTintColor: Colors.transparent,
         margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       ),
@@ -207,12 +205,10 @@ class AppTheme {
         primary: accentBlue,
         secondary: secondaryBlue,
         surface: Color(0xFF1E293B),
-        background: Color(0xFF0F172A),
         error: errorRed,
         onPrimary: Colors.white,
         onSecondary: Colors.white,
         onSurface: Colors.white,
-        onBackground: Colors.white,
       ),
     );
   }

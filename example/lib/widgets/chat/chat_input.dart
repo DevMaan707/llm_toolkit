@@ -6,14 +6,14 @@ class ChatInput extends StatefulWidget {
   final bool isGenerating;
 
   const ChatInput({
-    Key? key,
+    super.key,
     required this.onSendMessage,
     required this.onStopGeneration,
     required this.isGenerating,
-  }) : super(key: key);
+  });
 
   @override
-  _ChatInputState createState() => _ChatInputState();
+  State<ChatInput> createState() => _ChatInputState();
 }
 
 class _ChatInputState extends State<ChatInput> {

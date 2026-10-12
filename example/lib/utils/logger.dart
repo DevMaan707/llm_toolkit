@@ -1,9 +1,10 @@
 import 'package:flutter/foundation.dart';
+import 'package:llm_toolkit/llm_toolkit.dart' show ToolkitLog;
 
-enum LogLevel { info, success, warning, error }
+enum AppLogLevel { info, success, warning, error }
 
 class LogEntry {
-  final LogLevel level;
+  final AppLogLevel level;
   final String message;
   final dynamic error;
   final DateTime timestamp;
@@ -21,13 +22,13 @@ class AppLogger extends ChangeNotifier {
 
   List<LogEntry> get logs => List.unmodifiable(_logs);
 
-  void info(String message) => _log(LogLevel.info, message);
-  void success(String message) => _log(LogLevel.success, message);
-  void warning(String message) => _log(LogLevel.warning, message);
+  void info(String message) => _log(AppLogLevel.info, message);
+  void success(String message) => _log(AppLogLevel.success, message);
+  void warning(String message) => _log(AppLogLevel.warning, message);
   void error(String message, [dynamic error]) =>
-      _log(LogLevel.error, message, error);
+      _log(AppLogLevel.error, message, error);
 
-  void _log(LogLevel level, String message, [dynamic error]) {
+  void _log(AppLogLevel level, String message, [dynamic error]) {
     final entry = LogEntry(
       level: level,
       message: message,
@@ -40,12 +41,17 @@ class AppLogger extends ChangeNotifier {
       _logs.removeAt(0);
     }
 
-    notifyListeners(); // Notify listeners when new logs are added
+    notifyListeners();
 
-    if (kDebugMode) {
-      print(
-        '[${level.name.toUpperCase()}] $message${error != null ? ': $error' : ''}',
-      );
+    final text = error == null ? message : '$message: $error';
+    switch (level) {
+      case AppLogLevel.info:
+      case AppLogLevel.success:
+        ToolkitLog.info('App', text);
+      case AppLogLevel.warning:
+        ToolkitLog.warning('App', text);
+      case AppLogLevel.error:
+        ToolkitLog.error('App', text);
     }
   }
 

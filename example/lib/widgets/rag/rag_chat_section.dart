@@ -5,7 +5,7 @@ import '../../screens/rag_chat_screen.dart';
 class RagChatSection extends StatelessWidget {
   final RagService ragService;
 
-  const RagChatSection({Key? key, required this.ragService}) : super(key: key);
+  const RagChatSection({super.key, required this.ragService});
 
   @override
   Widget build(BuildContext context) {
@@ -68,7 +68,7 @@ class RagChatSection extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.purple.withOpacity(0.3),
+            color: Colors.purple.withValues(alpha: 0.3),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -88,7 +88,7 @@ class RagChatSection extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
+                        color: Colors.white.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: const Icon(
@@ -124,7 +124,7 @@ class RagChatSection extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
+                        color: Colors.white.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: const Icon(
@@ -139,7 +139,7 @@ class RagChatSection extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.1),
+                    color: Colors.white.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(

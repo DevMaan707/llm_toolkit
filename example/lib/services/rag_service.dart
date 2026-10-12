@@ -1,30 +1,27 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:path_provider/path_provider.dart';
+import 'package:llm_toolkit/llm_toolkit.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart';
-import 'package:llm_toolkit/src/core/rag/rag_engine.dart';
-import 'package:llm_toolkit/src/core/rag/engines/llama_rag_engine.dart';
-import 'package:llm_toolkit/src/core/rag/models/rag_models.dart';
 import '../models/app_models.dart';
 import '../utils/logger.dart';
 
 class RagService extends ChangeNotifier {
   final AppLogger _logger = AppLogger();
 
-  RagEngine? _ragEngine;
-  final List<RagDocument> _documents = [];
+  LlamaEngine? _embedder;
+  LlamaEngine? _generator;
+  RagPipeline? _pipeline;
+  final List<IndexedDocument> _documents = [];
   bool _isInitialized = false;
   bool _isProcessing = false;
   String? _selectedEmbeddingModel;
   String? _selectedLLMModel;
 
   // Getters
-  RagEngine? get ragEngine => _ragEngine;
-  List<RagDocument> get documents => List.unmodifiable(_documents);
+  List<IndexedDocument> get documents => List.unmodifiable(_documents);
   bool get isInitialized => _isInitialized;
   bool get isProcessing => _isProcessing;
   String? get selectedEmbeddingModel => _selectedEmbeddingModel;
@@ -40,20 +37,29 @@ class RagService extends ChangeNotifier {
     _setProcessing(true);
 
     try {
-      // Dispose existing engine if any
-      if (_ragEngine != null) {
-        await _ragEngine!.dispose();
-        _ragEngine = null;
-      }
+      await _releaseEngines();
 
-      // Create new RAG engine
-      _ragEngine = LlamaRagEngine(
-        embeddingModelPath: embeddingModelPath,
-        llmModelPath: llmModelPath,
-        libraryPath: 'libllama.so',
+      _embedder = LlamaEngine();
+      await _embedder!.loadModel(
+        embeddingModelPath,
+        const InferenceConfig(contextSize: 1024, extra: {'embedding': true}),
+      );
+      _generator = LlamaEngine();
+      await _generator!.loadModel(
+        llmModelPath,
+        const InferenceConfig(contextSize: 4096),
       );
 
-      await _ragEngine!.initialize();
+      _pipeline = RagPipeline(
+        embedder: _embedder!,
+        generator: _generator,
+        store: InMemoryVectorStore(),
+        config: const RagConfig(
+          topK: 5,
+          minScore: 0.3,
+          generation: GenerationParams(maxTokens: 1000),
+        ),
+      );
 
       _selectedEmbeddingModel = embeddingModelPath.split('/').last;
       _selectedLLMModel = llmModelPath.split('/').last;
@@ -62,6 +68,7 @@ class RagService extends ChangeNotifier {
       _logger.success('✅ RAG engine initialized successfully');
     } catch (e) {
       _logger.error('❌ Failed to initialize RAG engine', e);
+      await _releaseEngines();
       _isInitialized = false;
       rethrow;
     } finally {
@@ -254,26 +261,31 @@ class RagService extends ChangeNotifier {
 
       _logger.info('📄 Extracted ${content.length} characters from $fileName');
 
-      // Create document ID
       final documentId = 'doc_${DateTime.now().millisecondsSinceEpoch}';
 
-      // Add to RAG engine
-      await _ragEngine!.addDocument(documentId, content, {
-        'fileName': fileName,
-        'filePath': filePath,
-        'fileType': fileExtension,
-        'addedAt': DateTime.now().toIso8601String(),
-        'fileSize': content.length,
-        'originalFileSize': fileSize,
-      });
+      final ingest = await _pipeline!.addDocument(
+        RagDocument(
+          id: documentId,
+          text: content,
+          metadata: {
+            'fileName': fileName,
+            'filePath': filePath,
+            'fileType': fileExtension,
+            'originalFileSize': fileSize,
+          },
+        ),
+      );
+      if (ingest.documentsAdded == 0) {
+        _logger.warning('⚠️ $fileName is already in the knowledge base');
+        return;
+      }
 
-      // Add to local documents list
-      final ragDoc = RagDocument(
+      final ragDoc = IndexedDocument(
         id: documentId,
         name: fileName,
         content: content,
         addedAt: DateTime.now(),
-        chunkCount: _estimateChunkCount(content),
+        chunkCount: ingest.chunksAdded,
         fileSize: content.length,
         fileType: fileExtension,
       );
@@ -409,7 +421,7 @@ class RagService extends ChangeNotifier {
     if (!_isInitialized) return;
 
     try {
-      await _ragEngine!.removeDocument(documentId);
+      await _pipeline!.removeDocument(documentId);
       _documents.removeWhere((doc) => doc.id == documentId);
       _logger.success('🗑️ Document removed successfully');
     } catch (e) {
@@ -419,9 +431,10 @@ class RagService extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Query RAG engine
-  Future<RagResponse> queryRAG(String query, {RagConfig? config}) async {
-    if (!_isInitialized || _ragEngine == null) {
+  /// Retrieves relevant chunks and generates an answer from them.
+  Future<RagReply> queryRAG(String query) async {
+    final pipeline = _pipeline;
+    if (!_isInitialized || pipeline == null) {
       throw Exception('RAG engine not initialized');
     }
 
@@ -430,11 +443,18 @@ class RagService extends ChangeNotifier {
     );
 
     try {
-      final response = await _ragEngine!.query(query, config: config);
+      final answer = await pipeline.answer(query);
+      final text = StringBuffer();
+      await for (final token in answer.stream) {
+        text.write(token);
+      }
+      final sources = answer.sources;
+      final confidence =
+          sources.isEmpty ? 0.0 : sources.first.score.clamp(0.0, 1.0);
       _logger.success(
-        '✅ RAG query completed (confidence: ${response.confidence.toStringAsFixed(2)})',
+        '✅ RAG query completed (confidence: ${confidence.toStringAsFixed(2)})',
       );
-      return response;
+      return RagReply(text.toString().trim(), sources, confidence);
     } catch (e) {
       _logger.error('❌ RAG query failed', e);
       rethrow;
@@ -448,9 +468,12 @@ class RagService extends ChangeNotifier {
         .toList();
   }
 
-  int _estimateChunkCount(String content) {
-    final wordCount = content.split(RegExp(r'\s+')).length;
-    return (wordCount / 150).ceil();
+  Future<void> _releaseEngines() async {
+    _pipeline = null;
+    await _embedder?.unloadModel();
+    await _generator?.unloadModel();
+    _embedder = null;
+    _generator = null;
   }
 
   void _setProcessing(bool processing) {
@@ -460,14 +483,23 @@ class RagService extends ChangeNotifier {
 
   @override
   void dispose() {
-    _ragEngine?.dispose();
+    _releaseEngines();
     _logger.dispose();
     super.dispose();
   }
 }
 
-// RagDocument class remains the same
-class RagDocument {
+/// A document added to the knowledge base, as shown in the UI.
+/// Answer to a RAG question together with the chunks it was based on.
+class RagReply {
+  final String answer;
+  final List<RetrievedChunk> sources;
+  final double confidence;
+
+  const RagReply(this.answer, this.sources, this.confidence);
+}
+
+class IndexedDocument {
   final String id;
   final String name;
   final String content;
@@ -476,7 +508,7 @@ class RagDocument {
   final int fileSize;
   final String fileType;
 
-  RagDocument({
+  IndexedDocument({
     required this.id,
     required this.name,
     required this.content,
@@ -488,8 +520,9 @@ class RagDocument {
 
   String get formattedSize {
     if (fileSize < 1024) return '$fileSize B';
-    if (fileSize < 1024 * 1024)
+    if (fileSize < 1024 * 1024) {
       return '${(fileSize / 1024).toStringAsFixed(1)} KB';
+    }
     return '${(fileSize / (1024 * 1024)).toStringAsFixed(1)} MB';
   }
 

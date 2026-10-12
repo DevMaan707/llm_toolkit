@@ -5,7 +5,7 @@ import '../../screens/chat_screen.dart';
 class ModelStatusCard extends StatelessWidget {
   final LLMService llmService;
 
-  const ModelStatusCard({Key? key, required this.llmService}) : super(key: key);
+  const ModelStatusCard({super.key, required this.llmService});
 
   @override
   Widget build(BuildContext context) {
@@ -27,7 +27,7 @@ class ModelStatusCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
             boxShadow: [
               BoxShadow(
-                color: Colors.green.withOpacity(0.2),
+                color: Colors.green.withValues(alpha: 0.2),
                 blurRadius: 8,
                 offset: const Offset(0, 3),
               ),
@@ -40,7 +40,7 @@ class ModelStatusCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
+                    color: Colors.white.withValues(alpha: 0.2),
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(
@@ -64,7 +64,8 @@ class ModelStatusCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        '${llmService.selectedModelName} (${llmService.activeEngine?.name})',
+                        '${llmService.selectedModelName} (${llmService.activeEngine}) - '
+                        '${llmService.capabilities.map((c) => c.name).join(', ')}',
                         style: const TextStyle(
                           color: Colors.white70,
                           fontSize: 11,

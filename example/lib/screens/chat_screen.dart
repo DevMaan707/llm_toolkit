@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import 'dart:async';
 import '../services/llm_service.dart';
 import '../models/app_models.dart';
-import '../utils/app_colors.dart';
 import '../widgets/chat/chat_bubble.dart';
 import '../widgets/chat/chat_input.dart';
 import '../widgets/chat/typing_indicator.dart';
@@ -11,14 +10,14 @@ import '../widgets/chat/typing_indicator.dart';
 class ChatScreen extends StatefulWidget {
   final LLMService llmService;
 
-  const ChatScreen({Key? key, required this.llmService}) : super(key: key);
+  const ChatScreen({super.key, required this.llmService});
 
   @override
-  _ChatScreenState createState() => _ChatScreenState();
+  State<ChatScreen> createState() => _ChatScreenState();
 }
 
 class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
-  final List<ChatMessage> _messages = [];
+  final List<UiMessage> _messages = [];
   final ScrollController _scrollController = ScrollController();
   bool _isGenerating = false;
   late AnimationController _animationController;
@@ -43,7 +42,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   }
 
   void _addWelcomeMessage() {
-    final welcomeMessage = ChatMessage(
+    final welcomeMessage = UiMessage(
       text: "Hello! I'm ready to help you. What would you like to talk about?",
       isUser: false,
     );
@@ -88,7 +87,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       leading: Container(
         margin: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.1),
+          color: Colors.white.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(8),
         ),
         child: IconButton(
@@ -106,7 +105,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
           Container(
             padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.15),
+              color: Colors.white.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(8),
             ),
             child: const Icon(
@@ -129,7 +128,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                   ),
                 ),
                 Text(
-                  '${widget.llmService.activeEngine?.name ?? 'Unknown'} Engine',
+                  '${widget.llmService.activeEngine ?? 'Unknown'} Engine',
                   style: const TextStyle(color: Colors.white70, fontSize: 10),
                 ),
               ],
@@ -141,7 +140,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
         Container(
           margin: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.1),
+            color: Colors.white.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(8),
           ),
           child: IconButton(
@@ -209,7 +208,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
               borderRadius: BorderRadius.circular(6),
             ),
             child: Text(
-              '${_messages.length} msgs',
+              _usageLabel(),
               style: TextStyle(
                 fontSize: 9,
                 color: Colors.blue.shade600,
@@ -277,7 +276,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   void _sendMessage(String text) {
     if (text.trim().isEmpty || _isGenerating) return;
 
-    final userMessage = ChatMessage(text: text, isUser: true);
+    final userMessage = UiMessage(text: text, isUser: true);
     setState(() {
       _messages.add(userMessage);
       _isGenerating = true;
@@ -286,7 +285,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     _scrollToBottom();
 
     // Create AI message with empty text initially
-    final aiMessage = ChatMessage(text: '', isUser: false);
+    final aiMessage = UiMessage(text: '', isUser: false);
     setState(() => _messages.add(aiMessage));
 
     _animationController.forward();
@@ -296,7 +295,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
 
     // Start new generation
     _generationSubscription = widget.llmService
-        .generateText(text)
+        .sendMessage(text)
         .listen(
           (token) {
             if (mounted) {
@@ -304,8 +303,8 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                 // Find the AI message index and update it
                 final aiMessageIndex = _messages.length - 1;
                 if (aiMessageIndex >= 0 && !_messages[aiMessageIndex].isUser) {
-                  // Create a new ChatMessage object instead of modifying the existing one
-                  _messages[aiMessageIndex] = ChatMessage(
+                  // Create a new UiMessage object instead of modifying the existing one
+                  _messages[aiMessageIndex] = UiMessage(
                     text: _messages[aiMessageIndex].text + token,
                     isUser: false,
                     timestamp: _messages[aiMessageIndex].timestamp,
@@ -326,7 +325,6 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
             }
           },
           onDone: () {
-            print('Generation completed normally');
             if (mounted) {
               setState(() {
                 _isGenerating = false;
@@ -336,13 +334,12 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
             }
           },
           onError: (error) {
-            print('Generation error: $error');
             if (mounted) {
               setState(() {
                 final aiMessageIndex = _messages.length - 1;
                 if (aiMessageIndex >= 0 && !_messages[aiMessageIndex].isUser) {
                   final currentText = _messages[aiMessageIndex].text;
-                  _messages[aiMessageIndex] = ChatMessage(
+                  _messages[aiMessageIndex] = UiMessage(
                     text:
                         currentText.isEmpty
                             ? 'Sorry, I encountered an error: $error'
@@ -362,8 +359,15 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
         );
   }
 
+  String _usageLabel() {
+    final tps = widget.llmService.lastUsage?.tokensPerSecond;
+    return tps == null
+        ? '${_messages.length} msgs'
+        : '${_messages.length} msgs - ${tps.toStringAsFixed(1)} tok/s';
+  }
+
   void _stopGeneration() {
-    print('Stopping generation...');
+    widget.llmService.stopGeneration();
     _generationSubscription?.cancel();
     _generationSubscription = null;
 
@@ -516,7 +520,8 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
               ElevatedButton(
                 onPressed: () {
                   Navigator.pop(context);
-                  _stopGeneration(); // Stop any ongoing generation
+                  _stopGeneration();
+                  widget.llmService.resetChat();
                   setState(() {
                     _messages.clear();
                     _addWelcomeMessage();

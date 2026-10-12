@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:llm_toolkit/llm_toolkit.dart';
 import '../../models/app_models.dart';
 import '../../services/llm_service.dart';
 
@@ -8,10 +7,10 @@ class RecommendedModelCard extends StatelessWidget {
   final LLMService llmService;
 
   const RecommendedModelCard({
-    Key? key,
+    super.key,
     required this.model,
     required this.llmService,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -22,7 +21,7 @@ class RecommendedModelCard extends StatelessWidget {
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 6,
             offset: const Offset(0, 2),
           ),
@@ -55,7 +54,7 @@ class RecommendedModelCard extends StatelessWidget {
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors:
-                  model.engine == InferenceEngineType.gemma
+                  model.engine == 'litert'
                       ? [Colors.blue.shade400, Colors.blue.shade600]
                       : [Colors.green.shade400, Colors.green.shade600],
               begin: Alignment.topLeft,
@@ -64,17 +63,15 @@ class RecommendedModelCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(10),
             boxShadow: [
               BoxShadow(
-                color: (model.engine == InferenceEngineType.gemma
-                        ? Colors.blue
-                        : Colors.green)
-                    .withOpacity(0.2),
+                color: (model.engine == 'litert' ? Colors.blue : Colors.green)
+                    .withValues(alpha: 0.2),
                 blurRadius: 4,
                 offset: const Offset(0, 2),
               ),
             ],
           ),
           child: Icon(
-            model.engine == InferenceEngineType.gemma
+            model.engine == 'litert'
                 ? Icons.psychology_rounded
                 : Icons.memory_rounded,
             color: Colors.white,
@@ -177,7 +174,7 @@ class RecommendedModelCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: bgColor,
         borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: textColor.withOpacity(0.3)),
+        border: Border.all(color: textColor.withValues(alpha: 0.3)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -354,7 +351,7 @@ class RecommendedModelCard extends StatelessWidget {
 class ModelDetailsSheet extends StatelessWidget {
   final RecommendedModel model;
 
-  const ModelDetailsSheet({Key? key, required this.model}) : super(key: key);
+  const ModelDetailsSheet({super.key, required this.model});
 
   @override
   Widget build(BuildContext context) {
@@ -398,7 +395,7 @@ class ModelDetailsSheet extends StatelessWidget {
                 ),
                 _buildDetailRow(
                   'Engine',
-                  model.engine.name.toUpperCase(),
+                  model.engine.toUpperCase(),
                   Icons.memory_rounded,
                 ),
                 _buildDetailRow('Size', model.size, Icons.storage_rounded),

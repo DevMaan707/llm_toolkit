@@ -1,5 +1,38 @@
 # LLM Toolkit SDK Changelog
 
+## Version 0.1.0
+
+A ground-up modernisation. **Breaking release.**
+
+### Added
+- **Capability-based engines** (`InferenceEngine` + `TextGenerator`, `ChatGenerator`, `Embedder`, `VisionGenerator`, `SpeechRecognizer`, `SpeechSynthesizer`, `ImageGenerator`, `VideoGenerator`); multiple models can be loaded simultaneously and custom engines registered.
+- `LlamaEngine` rewritten for `llama_cpp_dart` 0.2.x: embeddings, vision (with `mmprojPath`), stop sequences, cancellation, memory-aware context sizing.
+- Small-device tuning for `LlamaEngine`: pure-Dart GGUF metadata reader, `MemoryPlanner`/`ResourcePlan` (context, KV cache type `f16`/`q8_0`/`q4_0`, flash attention, batch sizes, threads from GQA and sliding-window aware estimates), `InferenceConfig.optimizeForDevice` and explicit overrides, `LlamaEngine.planFor`/`lastPlan`/`chatTemplate`.
+- `LiteRtEngine` on `flutter_edge_ai` / LiteRT-LM (replaces the discontinued `flutter_gemma`).
+- Chat layer: `ChatSession`, prompt templates, context trimming, usage stats, persistence.
+- Structured JSON output with schema validation and retry; tool/function calling with `ToolRunner`.
+- RAG: chunkers, `InMemoryVectorStore`, `FileVectorStore`, hybrid BM25 + MMR retrieval, cited answers.
+- Providers: Hugging Face (rewritten, filtered, concurrent), Ollama, local folders; resumable `DownloadManager` with checksum verification and `ModelStore`.
+- `OpenAiCompatibleEngine` and `OllamaEngine`: hosted/LAN models (Kimi, DeepSeek, Qwen, GPT-class, LM Studio, vLLM, OpenRouter) through the same capability interfaces, plus `RemoteModelPresets`.
+- Prompt templates for Kimi, GLM, SmolLM, LFM2, Granite, Command-R, OLMo, InternLM, MiniCPM, Yi and gpt-oss; template selection from the GGUF-embedded chat template.
+- `scripts/build_android_libs.sh` builds the llama.cpp revision matching `llama_cpp_dart` (the old committed binaries came from a different revision and lacked `libmtmd.so`).
+- `ToolkitLog` for pluggable logging.
+- Test suite (250+ tests).
+
+### Changed
+- ASR rebuilt in small modules: Whisper-accurate mel features, real overlap handling in streaming, level-based VAD, `record` 7 PCM streaming.
+- Dependencies updated: `llama_cpp_dart` ^0.2.2, `tflite_flutter` ^0.12, `record` ^7, `flutter_lints` ^6.
+- Config types no longer expose `flutter_gemma` classes (`ComputeBackend`, `ModelFamily`).
+
+### Removed
+- 37 empty placeholder files, the old `LlamaRagEngine`, Gemma/TFLite engines, `InferenceEngineType`, wav2vec2/DeepSpeech guess decoders, hard-coded build scripts, unused `objectbox`/`json_annotation` dependencies, and all `print` logging.
+
+### Migration
+- `flutter_gemma` types are no longer re-exported; use `flutter_edge_ai` directly if you need them.
+- `SearchQuery(searchTerm:, onlyCompatible:)` → `SearchQuery(text:, onlyRunnable:)`; `ModelFile.size` → `sizeBytes`.
+- `generateText(prompt, params: GenerationParams.balanced())` → `GenerationParams.balanced()` is now a const constructor.
+- `ASRService().initialize(path, config:)` → `ASRService(config:)` then `initialize(path)`.
+
 ## Version 0.0.4 - *July 4, 2025*
 
 ### 🎤 New Features - Speech Recognition (ASR)

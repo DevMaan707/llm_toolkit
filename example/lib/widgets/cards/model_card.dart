@@ -8,8 +8,7 @@ class ModelCard extends StatefulWidget {
   final ModelInfo model;
   final LLMService llmService;
 
-  const ModelCard({Key? key, required this.model, required this.llmService})
-    : super(key: key);
+  const ModelCard({super.key, required this.model, required this.llmService});
 
   @override
   State<ModelCard> createState() => _ModelCardState();
@@ -41,11 +40,14 @@ class _ModelCardState extends State<ModelCard>
 
   @override
   Widget build(BuildContext context) {
-    final predictedEngine = ModelDetector.instance.detectEngine(
-      widget.model.compatibleFiles.isNotEmpty
-          ? widget.model.compatibleFiles.first.filename
-          : widget.model.name,
-    );
+    final predictedEngine =
+        ModelDetector.instance
+            .detect(
+              widget.model.loadableFiles.isNotEmpty
+                  ? widget.model.loadableFiles.first.filename
+                  : widget.model.name,
+            )
+            .engineId;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -54,12 +56,12 @@ class _ModelCardState extends State<ModelCard>
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
         ],
-        border: Border.all(color: Colors.grey.withOpacity(0.1), width: 1),
+        border: Border.all(color: Colors.grey.withValues(alpha: 0.1), width: 1),
       ),
       child: Theme(
         data: Theme.of(context).copyWith(
@@ -107,7 +109,7 @@ class _ModelCardState extends State<ModelCard>
             child: Container(
               padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
-                color: const Color(0xFF3B82F6).withOpacity(0.1),
+                color: const Color(0xFF3B82F6).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: const Icon(
@@ -128,8 +130,8 @@ class _ModelCardState extends State<ModelCard>
     );
   }
 
-  Widget _buildModelIcon(InferenceEngineType engine) {
-    final isGemma = engine == InferenceEngineType.gemma;
+  Widget _buildModelIcon(String engine) {
+    final isGemma = engine == 'litert';
 
     return Container(
       width: 40,
@@ -147,7 +149,7 @@ class _ModelCardState extends State<ModelCard>
         boxShadow: [
           BoxShadow(
             color: (isGemma ? const Color(0xFF3B82F6) : const Color(0xFF059669))
-                .withOpacity(0.2),
+                .withValues(alpha: 0.2),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -172,7 +174,7 @@ class _ModelCardState extends State<ModelCard>
         const SizedBox(width: 16),
         _buildStatItem(
           Icons.folder_rounded,
-          '${widget.model.compatibleFiles.length}',
+          '${widget.model.loadableFiles.length}',
           'files',
         ),
       ],
@@ -210,30 +212,30 @@ class _ModelCardState extends State<ModelCard>
     );
   }
 
-  Widget _buildBadges(InferenceEngineType predictedEngine) {
+  Widget _buildBadges(String predictedEngine) {
     return Wrap(
       spacing: 6,
       runSpacing: 4,
       children: [
         _buildEngineBadge(predictedEngine),
-        if (widget.model.ggufFiles.isNotEmpty)
+        if (widget.model.filesOf(ModelFormat.gguf).isNotEmpty)
           _buildFormatBadge('GGUF', const Color(0xFF059669)),
-        if (widget.model.tfliteFiles.isNotEmpty)
+        if (widget.model.filesOf(ModelFormat.tflite).isNotEmpty)
           _buildFormatBadge('TFLite', const Color(0xFF3B82F6)),
       ],
     );
   }
 
-  Widget _buildEngineBadge(InferenceEngineType engine) {
-    final isGemma = engine == InferenceEngineType.gemma;
+  Widget _buildEngineBadge(String engine) {
+    final isGemma = engine == 'litert';
     final color = isGemma ? const Color(0xFF3B82F6) : const Color(0xFF059669);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: color.withOpacity(0.2), width: 1),
+        border: Border.all(color: color.withValues(alpha: 0.2), width: 1),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -245,7 +247,7 @@ class _ModelCardState extends State<ModelCard>
           ),
           const SizedBox(width: 4),
           Text(
-            '${engine.name.toUpperCase()}',
+            engine.toUpperCase(),
             style: TextStyle(
               fontSize: 9,
               fontWeight: FontWeight.w600,
@@ -262,9 +264,9 @@ class _ModelCardState extends State<ModelCard>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: color.withOpacity(0.2), width: 1),
+        border: Border.all(color: color.withValues(alpha: 0.2), width: 1),
       ),
       child: Text(
         format,
@@ -310,7 +312,7 @@ class _ModelCardState extends State<ModelCard>
           Container(
             padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
-              color: const Color(0xFF3B82F6).withOpacity(0.1),
+              color: const Color(0xFF3B82F6).withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(6),
             ),
             child: const Icon(
@@ -349,13 +351,13 @@ class _ModelCardState extends State<ModelCard>
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                const Color(0xFF3B82F6).withOpacity(0.1),
-                const Color(0xFF3B82F6).withOpacity(0.05),
+                const Color(0xFF3B82F6).withValues(alpha: 0.1),
+                const Color(0xFF3B82F6).withValues(alpha: 0.05),
               ],
             ),
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
-              color: const Color(0xFF3B82F6).withOpacity(0.2),
+              color: const Color(0xFF3B82F6).withValues(alpha: 0.2),
               width: 1,
             ),
           ),
@@ -368,7 +370,7 @@ class _ModelCardState extends State<ModelCard>
               ),
               const SizedBox(width: 6),
               Text(
-                'Available Files (${widget.model.compatibleFiles.length})',
+                'Available Files (${widget.model.loadableFiles.length})',
                 style: const TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: 12,
@@ -380,10 +382,10 @@ class _ModelCardState extends State<ModelCard>
           ),
         ),
         const SizedBox(height: 10),
-        if (widget.model.compatibleFiles.isEmpty)
+        if (widget.model.loadableFiles.isEmpty)
           _buildNoFilesState()
         else
-          ...widget.model.compatibleFiles
+          ...widget.model.loadableFiles
               .take(5)
               .map(
                 (file) => Padding(
@@ -394,8 +396,7 @@ class _ModelCardState extends State<ModelCard>
                     llmService: widget.llmService,
                   ),
                 ),
-              )
-              .toList(),
+              ),
       ],
     );
   }
@@ -407,7 +408,7 @@ class _ModelCardState extends State<ModelCard>
         color: const Color(0xFFFEF3C7),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: const Color(0xFFF59E0B).withOpacity(0.3),
+          color: const Color(0xFFF59E0B).withValues(alpha: 0.3),
           width: 1,
         ),
       ),
@@ -416,7 +417,7 @@ class _ModelCardState extends State<ModelCard>
           Container(
             padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
-              color: const Color(0xFFF59E0B).withOpacity(0.2),
+              color: const Color(0xFFF59E0B).withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(6),
             ),
             child: const Icon(

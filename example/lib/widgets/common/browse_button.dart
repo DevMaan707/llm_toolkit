@@ -5,10 +5,10 @@ class BrowseButton extends StatelessWidget {
   final bool isLoading;
 
   const BrowseButton({
-    Key? key,
+    super.key,
     required this.onPressed,
     this.isLoading = false,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -23,7 +23,7 @@ class BrowseButton extends StatelessWidget {
         borderRadius: BorderRadius.circular(10),
         boxShadow: [
           BoxShadow(
-            color: Colors.purple.withOpacity(0.2),
+            color: Colors.purple.withValues(alpha: 0.2),
             blurRadius: 6,
             offset: const Offset(0, 2),
           ),

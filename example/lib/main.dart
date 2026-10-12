@@ -7,6 +7,8 @@ void main() {
 }
 
 class LLMToolkitApp extends StatelessWidget {
+  const LLMToolkitApp({super.key});
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(

@@ -10,11 +10,11 @@ class FileCard extends StatelessWidget {
   final LLMService llmService;
 
   const FileCard({
-    Key? key,
+    super.key,
     required this.model,
     required this.file,
     required this.llmService,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -105,7 +105,9 @@ class FileCard extends StatelessWidget {
                           ),
                           const SizedBox(width: 4),
                           Text(
-                            file.size > 0 ? file.sizeFormatted : 'Size unknown',
+                            (file.sizeBytes ?? 0) > 0
+                                ? file.sizeFormatted
+                                : 'Size unknown',
                             style: TextStyle(
                               color: Colors.grey.shade600,
                               fontSize: 10,
@@ -138,7 +140,8 @@ class FileCard extends StatelessWidget {
   }
 
   Widget _buildFormatBadge() {
-    MaterialColor color = file.fileType == 'GGUF' ? Colors.green : Colors.blue;
+    MaterialColor color =
+        file.format == ModelFormat.gguf ? Colors.green : Colors.blue;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -148,7 +151,7 @@ class FileCard extends StatelessWidget {
         border: Border.all(color: color.shade300),
       ),
       child: Text(
-        file.fileType,
+        (file.format?.extension.toUpperCase() ?? ''),
         style: TextStyle(
           fontSize: 8,
           fontWeight: FontWeight.bold,
@@ -309,7 +312,7 @@ class FileCard extends StatelessWidget {
         path: actualPath,
         size: file.sizeFormatted,
         lastModified: DateTime.now(),
-        engine: ModelDetector.instance.detectEngine(file.filename),
+        engine: ModelDetector.instance.detect(file.filename).engineId,
       );
 
       await llmService.loadLocalModel(localModel);

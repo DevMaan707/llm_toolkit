@@ -1,773 +1,385 @@
 import 'dart:async';
-import 'dart:typed_data';
 import 'dart:io';
-import 'package:record/record.dart';
-import 'package:path_provider/path_provider.dart';
-import '../core/inference/tflite_asr_engine.dart';
+import 'dart:typed_data';
+
+import 'package:path/path.dart' as p;
+
 import '../core/config.dart';
+import '../core/inference/asr/asr_config.dart';
+import '../core/inference/asr/asr_engine.dart';
+import '../core/inference/asr/audio_decoder.dart';
+import '../core/inference/asr/chunking.dart';
+import '../core/inference/asr/pcm_recorder.dart';
+import '../core/inference/asr/transcript_text.dart';
+import '../core/inference/asr/vad.dart';
+import '../core/inference/asr/wav_format.dart';
+import '../core/inference/base_inference_engine.dart';
+import '../core/logging/toolkit_logger.dart';
 import '../exceptions/llm_toolkit_exceptions.dart';
 
+const _tag = 'ASRService';
+
+enum _Mode { idle, recording, streaming }
+
+/// High-level speech recognition: file/bytes transcription, microphone
+/// recording (plain, timed, voice-activated) and live streaming transcription.
+///
+/// Use [ASRService.new] followed by [initialize] with a Whisper TFLite model, or
+/// [ASRService.withRecognizer] to plug in any [SpeechRecognizer] (and a custom
+/// [PcmRecorder]), e.g. in tests.
 class ASRService {
-  TFLiteASREngine? _asrEngine;
-  bool _isInitialized = false;
-  String? _currentModelPath;
-  ASRModelType? _currentModelType;
+  ASRService({ASRConfig config = const ASRConfig(), PcmRecorder? recorder})
+    : _config = config,
+      _recorder = recorder,
+      _ownsRecognizer = true;
 
-  // Audio recording
-  final AudioRecorder _audioRecorder = AudioRecorder();
-  bool _isRecording = false;
-  bool _isStreamingMode = false;
+  ASRService.withRecognizer(
+    SpeechRecognizer recognizer, {
+    ASRConfig config = const ASRConfig(),
+    PcmRecorder? recorder,
+  }) : _config = config,
+       _recorder = recorder,
+       _recognizer = recognizer,
+       _ownsRecognizer = false;
 
-  // Streaming
-  StreamController<String>? _transcriptionController;
-  Timer? _streamingTimer;
-  List<double> _audioBuffer = [];
+  final ASRConfig _config;
+  final bool _ownsRecognizer;
+  SpeechRecognizer? _recognizer;
+  PcmRecorder? _recorder;
 
-  // Configuration
-  ASRConfig _config = ASRConfig.defaultConfig();
+  String? _modelPath;
+  _Mode _mode = _Mode.idle;
 
-  /// Initialize ASR service with a model
-  Future<void> initialize(String modelPath, {ASRConfig? config}) async {
-    try {
-      print('🎤 Initializing ASR Service...');
+  _Capture? _capture;
+  _StreamingSession? _session;
 
-      _config = config ?? ASRConfig.defaultConfig();
-      _asrEngine = TFLiteASREngine();
+  ASRConfig get config => _config;
+  bool get isInitialized => _recognizer != null;
+  bool get isRecording => _mode == _Mode.recording;
+  bool get isStreaming => _mode == _Mode.streaming;
+  String? get currentModelPath => _modelPath;
 
-      // Convert ASRConfig to InferenceConfig for compatibility
-      final inferenceConfig = InferenceConfig(
-        promptFormat: 'asr',
-        maxTokens: _config.maxTokens,
-        verbose: _config.verbose,
-      );
-
-      await _asrEngine!.loadModel(modelPath, inferenceConfig);
-
-      _isInitialized = true;
-      _currentModelPath = modelPath;
-      _currentModelType = _asrEngine!.modelType;
-
-      print('✅ ASR Service initialized successfully');
-      print('   Model: ${modelPath.split('/').last}');
-      print('   Type: ${_currentModelType?.name}');
-    } catch (e) {
-      await dispose();
-      throw InferenceException('Failed to initialize ASR service: $e');
-    }
-  }
-
-  Future<String> processAudioChunk(Uint8List audioBytes) async {
-    _checkInitialized();
-
-    try {
-      if (_asrEngine == null) {
-        throw InferenceException('ASR engine not available');
-      }
-
-      final audioSamples = await _asrEngine!.convertAudioToSamples(
-        audioBytes,
-        AudioFormat.wav,
-      );
-
-      if (audioSamples.isEmpty) {
-        return '';
-      }
-      final melFrames = await _asrEngine!.preprocessAudioSamples(audioSamples);
-
-      // Use inferChunk for fast processing
-      return await _asrEngine!.inferChunk(melFrames);
-    } catch (e) {
-      throw InferenceException('Failed to process audio chunk: $e');
-    }
-  }
-
-  Future<String> transcribeFile(String audioFilePath) async {
-    _checkInitialized();
-
-    try {
-      print(
-        '🎤 Transcribing file with enhanced processing: ${audioFilePath.split('/').last}',
-      );
-
-      final audioFile = File(audioFilePath);
-      if (!await audioFile.exists()) {
-        throw InferenceException('Audio file not found: $audioFilePath');
-      }
-
-      final audioBytes = await audioFile.readAsBytes();
-      final extension = audioFilePath.toLowerCase().split('.').last;
-
-      // Determine format
-      AudioFormat format;
-      switch (extension) {
-        case 'wav':
-          format = AudioFormat.wav;
-          break;
-        case 'pcm':
-          format = AudioFormat.pcm16;
-          break;
-        default:
-          format = AudioFormat.wav;
-      }
-
-      // Use enhanced transcription with chunking for longer files
-      final fileSize = audioBytes.length;
-      final estimatedDuration = fileSize / (16000 * 2); // Rough estimate
-
-      if (estimatedDuration > 15.0) {
-        // Use chunked transcription for longer files
-        return await _asrEngine!.transcribeAudioChunked(
-          audioBytes,
-          format: format,
-          sampleRate: _config.sampleRate,
-          useChunking: true,
-        );
-      } else {
-        // Use enhanced direct transcription
-        return await _asrEngine!.transcribeAudio(
-          audioBytes,
-          format: format,
-          sampleRate: _config.sampleRate,
-        );
-      }
-    } catch (e) {
-      throw InferenceException('Failed to transcribe file: $e');
-    }
-  }
-
-  /// Transcribe audio bytes directly
-  Future<String> transcribeBytes(
-    Uint8List audioBytes, {
-    AudioFormat format = AudioFormat.pcm16,
-    int sampleRate = 16000,
+  /// Loads the Whisper TFLite model at [modelPath] into a new [AsrEngine].
+  Future<void> initialize(
+    String modelPath, {
+    InferenceConfig inferenceConfig = const InferenceConfig(),
   }) async {
-    _checkInitialized();
-
+    if (!_ownsRecognizer) {
+      throw StateError('This service was created with its own recognizer');
+    }
+    await _releaseEngine();
+    final engine = AsrEngine(asrConfig: _config);
     try {
-      print(
-        '🎤 Transcribing ${audioBytes.length} bytes of ${format.name} audio',
-      );
-      return await _asrEngine!.transcribeAudio(
-        audioBytes,
-        format: format,
-        sampleRate: sampleRate,
-      );
+      await engine.loadModel(modelPath, inferenceConfig);
     } catch (e) {
-      throw InferenceException('Failed to transcribe audio bytes: $e');
+      throw e is LLMToolkitException
+          ? e
+          : InferenceException('Failed to initialize ASR service', e);
     }
+    _recognizer = engine;
+    _modelPath = modelPath;
   }
 
-  /// Start recording audio
-  Future<void> startRecording({bool streamingMode = false}) async {
-    _checkInitialized();
-
-    if (_isRecording) {
-      throw InferenceException('Already recording');
+  /// Transcribes an audio file. `.pcm`/`.raw` files are read as 16-bit mono PCM
+  /// at [ASRConfig.sampleRate]; anything else is detected from its header.
+  Future<String> transcribeFile(String path) async {
+    final file = File(path);
+    if (!await file.exists()) {
+      throw InferenceException('Audio file not found: $path');
     }
-
-    try {
-      // Check microphone permission
-      final hasPermission = await _audioRecorder.hasPermission();
-      if (!hasPermission) {
-        throw InferenceException('Microphone permission not granted');
-      }
-
-      _isStreamingMode = streamingMode;
-      _audioBuffer.clear();
-
-      // Get temporary directory for audio file
-      final tempDir = await getTemporaryDirectory();
-      final audioPath =
-          '${tempDir.path}/asr_recording_${DateTime.now().millisecondsSinceEpoch}.wav';
-
-      // Configure recording
-      final recordConfig = RecordConfig(
-        encoder: AudioEncoder.wav,
-        sampleRate: _config.sampleRate,
-        bitRate: _config.bitRate,
-        numChannels: 1, // Mono for ASR
-      );
-
-      await _audioRecorder.start(recordConfig, path: audioPath);
-      _isRecording = true;
-
-      print('🎤 Started recording (streaming: $_isStreamingMode)');
-
-      // Start streaming transcription if enabled
-      if (_isStreamingMode) {
-        _startStreamingTranscription();
-      }
-    } catch (e) {
-      _isRecording = false;
-      throw InferenceException('Failed to start recording: $e');
-    }
-  }
-
-  /// Stop recording and get transcription
-  Future<String> stopRecording() async {
-    _checkInitialized();
-
-    if (!_isRecording) {
-      throw InferenceException('Not currently recording');
-    }
-
-    try {
-      // Stop streaming if active
-      _stopStreamingTranscription();
-
-      final audioPath = await _audioRecorder.stop();
-      _isRecording = false;
-
-      if (audioPath == null) {
-        throw InferenceException('Failed to save audio recording');
-      }
-
-      print('🎤 Stopped recording, transcribing...');
-
-      // Read and transcribe the audio file
-      final audioFile = File(audioPath);
-      final audioBytes = await audioFile.readAsBytes();
-
-      final transcription = await transcribeBytes(
-        audioBytes,
-        format: AudioFormat.pcm16, // WAV files contain PCM16 data
-        sampleRate: _config.sampleRate,
-      );
-
-      // Clean up temp file
-      try {
-        await audioFile.delete();
-      } catch (e) {
-        print('Warning: Failed to delete temp file: $e');
-      }
-
-      return transcription;
-    } catch (e) {
-      _isRecording = false;
-      throw InferenceException('Failed to stop recording: $e');
-    }
-  }
-
-  Stream<String> startStreamingTranscription() async* {
-    _checkInitialized();
-
-    if (_transcriptionController != null &&
-        !_transcriptionController!.isClosed) {
-      await _transcriptionController!.close();
-    }
-
-    _transcriptionController = StreamController<String>.broadcast();
-    _isStreamingMode = true;
-
-    try {
-      // Check microphone permission
-      final hasPermission = await _audioRecorder.hasPermission();
-      if (!hasPermission) {
-        throw InferenceException('Microphone permission not granted');
-      }
-
-      print('🎤 Starting continuous streaming transcription...');
-
-      // Start the continuous streaming process
-      _startContinuousStreaming();
-
-      // Yield chunks from the controller
-      await for (final chunk in _transcriptionController!.stream) {
-        if (!_isStreamingMode) break;
-        yield chunk;
-      }
-    } catch (e) {
-      _isStreamingMode = false;
-      _transcriptionController?.close();
-      throw InferenceException('Failed to start streaming transcription: $e');
-    }
-  }
-
-  Future _startContinuousStreaming() async {
-    const chunkDuration = Duration(milliseconds: 6000); // 6 second chunks
-    const overlapDuration = Duration(milliseconds: 1500); // 1.5 second overlap
-    const minAudioThreshold =
-        96000; // Minimum bytes for 6 seconds at 16kHz mono
-
-    try {
-      final tempDir = await getTemporaryDirectory();
-
-      while (_isStreamingMode) {
-        final recordingPath =
-            '${tempDir.path}/stream_chunk_${DateTime.now().millisecondsSinceEpoch}.wav';
-
-        try {
-          await _audioRecorder.start(
-            RecordConfig(
-              encoder: AudioEncoder.wav,
-              sampleRate: _config.sampleRate,
-              bitRate: _config.bitRate,
-              numChannels: 1,
-            ),
-            path: recordingPath,
-          );
-
-          await Future.delayed(chunkDuration);
-
-          if (!_isStreamingMode) break;
-
-          final recordedPath = await _audioRecorder.stop();
-
-          if (recordedPath != null && _isStreamingMode) {
-            final audioFile = File(recordedPath);
-            if (await audioFile.exists()) {
-              final audioBytes = await audioFile.readAsBytes();
-
-              // Only process chunks with sufficient audio data
-              if (audioBytes.length > minAudioThreshold) {
-                try {
-                  final result = await transcribeBytes(
-                    audioBytes,
-                    format: AudioFormat.wav,
-                    sampleRate: _config.sampleRate,
-                  );
-
-                  if (TFLiteASREngine().isValidTranscription(result)) {
-                    print('🎤 Streaming chunk result: "$result"');
-
-                    if (_transcriptionController != null &&
-                        !_transcriptionController!.isClosed) {
-                      _transcriptionController!.add(result);
-                    }
-                  }
-                } catch (e) {
-                  print('❌ Error processing streaming chunk: $e');
-                }
-              } else {
-                print(
-                  '⚠️ Chunk too small, skipping (${audioBytes.length} bytes)',
-                );
-              }
-
-              try {
-                await audioFile.delete();
-              } catch (e) {
-                print('Warning: Failed to delete chunk file: $e');
-              }
-            }
-          }
-
-          if (_isStreamingMode) {
-            await Future.delayed(const Duration(milliseconds: 500));
-          }
-        } catch (e) {
-          print('❌ Error in streaming chunk cycle: $e');
-          await Future.delayed(const Duration(milliseconds: 1000));
-        }
-      }
-    } catch (e) {
-      print('❌ Fatal streaming error: $e');
-      _isStreamingMode = false;
-      _transcriptionController?.addError(e);
-    } finally {
-      print('🎤 Enhanced streaming loop ended');
-    }
-  }
-
-  /// Stop streaming transcription - enhanced version
-  Future<void> stopStreamingTranscription() async {
-    print('🎤 Stopping streaming transcription...');
-
-    _isStreamingMode = false;
-
-    // Stop any ongoing recording
-    if (_isRecording) {
-      try {
-        await _audioRecorder.stop();
-        _isRecording = false;
-      } catch (e) {
-        print('Warning: Error stopping recording: $e');
-      }
-    }
-
-    // Close the transcription controller
-    if (_transcriptionController != null &&
-        !_transcriptionController!.isClosed) {
-      _transcriptionController!.close();
-    }
-    _transcriptionController = null;
-
-    print('✅ Streaming transcription stopped');
-  }
-
-  Future<String> recordAndTranscribe(Duration duration) async {
-    _checkInitialized();
-
-    try {
-      await startRecording();
-
-      // Wait for the specified duration
-      await Future.delayed(duration);
-
-      return await stopRecording();
-    } catch (e) {
-      // Ensure recording is stopped even if there's an error
-      if (_isRecording) {
-        try {
-          await stopRecording();
-        } catch (_) {}
-      }
-      throw InferenceException('Failed to record and transcribe: $e');
-    }
-  }
-
-  Future<String> recordWithVAD({
-    Duration maxDuration = const Duration(seconds: 30),
-    Duration silenceTimeout = const Duration(seconds: 3),
-    double silenceThreshold = 0.01,
-  }) async {
-    _checkInitialized();
-
-    try {
-      await startRecording();
-
-      final startTime = DateTime.now();
-      DateTime lastVoiceActivity = DateTime.now();
-
-      // Monitor for voice activity
-      while (DateTime.now().difference(startTime) < maxDuration) {
-        await Future.delayed(const Duration(milliseconds: 100));
-
-        final currentTime = DateTime.now();
-        if (currentTime.difference(lastVoiceActivity) > silenceTimeout) {
-          print('🎤 Silence detected, stopping recording');
-          break;
-        }
-        if (_isRecording) {
-          lastVoiceActivity = currentTime;
-        }
-      }
-
-      return await stopRecording();
-    } catch (e) {
-      if (_isRecording) {
-        try {
-          await stopRecording();
-        } catch (_) {}
-      }
-      throw InferenceException('Failed to record with VAD: $e');
-    }
-  }
-
-  /// Internal method to handle streaming transcription
-  void _startStreamingTranscription() {
-    if (!_isStreamingMode || _transcriptionController == null) return;
-
-    _streamingTimer = Timer.periodic(
-      Duration(milliseconds: _config.streamingIntervalMs),
-      (timer) async {
-        if (!_isRecording || _transcriptionController == null) {
-          timer.cancel();
-          return;
-        }
-
-        try {
-          await _processStreamingChunk();
-        } catch (e) {
-          _transcriptionController?.addError(e);
-        }
-      },
+    final raw = const {
+      '.pcm',
+      '.raw',
+    }.contains(p.extension(path).toLowerCase());
+    return transcribeBytes(
+      await file.readAsBytes(),
+      format: raw ? AudioFormat.pcm16 : null,
     );
   }
 
-  /// Process a chunk of streaming audio
-  Future<void> _processStreamingChunk() async {
-    if (!_isRecording || _transcriptionController == null) return;
+  /// Transcribes in-memory audio. [format] defaults to auto-detection (WAV
+  /// header, else PCM16); [sampleRate] applies to the raw formats.
+  Future<String> transcribeBytes(
+    Uint8List bytes, {
+    AudioFormat? format,
+    int? sampleRate,
+  }) async {
+    final recognizer = _requireRecognizer();
+    final rate = sampleRate ?? _config.sampleRate;
+    final kind = format ?? AudioFormat.sniff(bytes);
+    final wav = switch (kind) {
+      AudioFormat.wav => bytes,
+      AudioFormat.pcm16 => wrapPcm16AsWav(bytes, rate),
+      _ => encodeWav16(
+        decodeAudio(bytes, format: kind, sampleRate: rate).samples,
+        rate,
+      ),
+    };
+    return recognizer.transcribe(wav);
+  }
 
-    try {
-      // Get current recording path
-      final tempDir = await getTemporaryDirectory();
+  /// Starts capturing from the microphone; finish with [stopRecording].
+  Future<void> startRecording() async {
+    _requireRecognizer();
+    _requireIdle();
+    await _startCapture();
+  }
 
-      // Stop current recording temporarily to get audio data
-      final currentPath = await _audioRecorder.stop();
-      if (currentPath != null) {
-        final audioFile = File(currentPath);
-        if (await audioFile.exists()) {
-          final audioBytes = await audioFile.readAsBytes();
+  /// Stops capturing and returns the transcription of everything recorded.
+  Future<String> stopRecording() async {
+    if (!isRecording) throw const InferenceException('Not recording');
+    final pcm = await _finishCapture();
+    _mode = _Mode.idle;
+    return pcm.isEmpty ? '' : transcribeBytes(pcm, format: AudioFormat.pcm16);
+  }
 
-          // Only process if we have enough audio data
-          if (audioBytes.length > 1024) {
-            // At least 1KB of audio
-            try {
-              final partialTranscription = await transcribeBytes(
-                audioBytes,
-                format: AudioFormat.pcm16,
-                sampleRate: _config.sampleRate,
-              );
+  /// Records for [duration] and returns the transcription.
+  Future<String> recordAndTranscribe(Duration duration) async {
+    await startRecording();
+    await Future<void>.delayed(duration);
+    return stopRecording();
+  }
 
-              if (partialTranscription.trim().isNotEmpty) {
-                _transcriptionController?.add(partialTranscription);
-              }
-            } catch (e) {
-              print('Chunk transcription error: $e');
-            }
-          }
-
-          // Clean up temp file
-          await audioFile.delete();
+  /// Records until [silenceTimeout] of silence follows (or [maxDuration] is
+  /// reached), then returns the transcription. Defaults come from [config].
+  Future<String> recordWithVAD({
+    Duration maxDuration = const Duration(seconds: 30),
+    Duration? silenceTimeout,
+    double? silenceThreshold,
+  }) async {
+    _requireRecognizer();
+    _requireIdle();
+    final endpoint = EndpointDetector(
+      vad: VoiceActivityDetector(
+        threshold: silenceThreshold ?? _config.vadSilenceThreshold,
+      ),
+      sampleRate: _config.sampleRate,
+      silenceTimeout: silenceTimeout ?? _config.vadSilenceTimeout,
+    );
+    final finished = Completer<void>();
+    await _startCapture(
+      onData: (bytes) {
+        if (!finished.isCompleted && endpoint.feed(pcm16ToFloat(bytes))) {
+          finished.complete();
         }
-      }
-
-      // Restart recording if still in streaming mode
-      if (_isStreamingMode && _isRecording) {
-        final newPath =
-            '${tempDir.path}/asr_streaming_${DateTime.now().millisecondsSinceEpoch}.wav';
-        await _audioRecorder.start(
-          RecordConfig(
-            encoder: AudioEncoder.wav,
-            sampleRate: _config.sampleRate,
-            bitRate: _config.bitRate,
-            numChannels: 1,
-          ),
-          path: newPath,
-        );
-      }
-    } catch (e) {
-      print('Streaming chunk processing error: $e');
-    }
-  }
-
-  /// Stop streaming transcription
-  void _stopStreamingTranscription() {
-    _streamingTimer?.cancel();
-    _streamingTimer = null;
-    _isStreamingMode = false;
-
-    _transcriptionController?.close();
-    _transcriptionController = null;
-  }
-
-  /// Get supported audio formats
-  List<AudioFormat> getSupportedFormats() {
-    return [AudioFormat.pcm16, AudioFormat.pcm32, AudioFormat.float32];
-  }
-
-  /// Get model information
-  Map<String, dynamic> getModelInfo() {
-    if (!_isInitialized || _asrEngine == null) {
-      return {'initialized': false};
-    }
-
-    return {
-      'initialized': true,
-      'modelPath': _currentModelPath,
-      'modelType': _currentModelType?.name,
-      'supportedFormats': getSupportedFormats().map((f) => f.name).toList(),
-    };
-  }
-
-  /// Get current recording status
-  Map<String, dynamic> getRecordingStatus() {
-    return {
-      'isRecording': _isRecording,
-      'isStreamingMode': _isStreamingMode,
-      'hasPermission': _audioRecorder.hasPermission(),
-      'config': {
-        'sampleRate': _config.sampleRate,
-        'bitRate': _config.bitRate,
-        'streamingInterval': _config.streamingIntervalMs,
-        'maxTokens': _config.maxTokens,
-        'confidenceThreshold': _config.confidenceThreshold,
       },
-    };
+    );
+    final timer = Timer(maxDuration, () {
+      if (!finished.isCompleted) finished.complete();
+    });
+    try {
+      await finished.future;
+    } finally {
+      timer.cancel();
+    }
+    return stopRecording();
   }
 
-  /// Update ASR configuration
-  void updateConfig(ASRConfig config) {
-    _config = config;
-    print('🎤 ASR configuration updated');
+  /// Starts the microphone and emits newly recognised text as each window
+  /// completes. Windows overlap by [ASRConfig.overlapDuration]; repeated words
+  /// are removed so the emitted pieces concatenate into one transcript. Cancel
+  /// the subscription or call [stopStreamingTranscription] to end.
+  Stream<String> startStreamingTranscription() {
+    final controller = StreamController<String>(
+      onCancel: stopStreamingTranscription,
+    );
+    unawaited(_startStreaming(controller));
+    return controller.stream;
   }
 
-  /// Get performance metrics
-  Map<String, dynamic> getPerformanceMetrics() {
-    return {
-      'modelLoaded': _isInitialized,
-      'modelType': _currentModelType?.name ?? 'Unknown',
-      'averageLatency': 'N/A', // Would need to track this
-      'totalTranscriptions': 'N/A', // Would need to track this
-      'errorRate': 'N/A', // Would need to track this
-    };
+  Future<void> _startStreaming(StreamController<String> controller) async {
+    try {
+      _requireRecognizer();
+      _requireIdle();
+      final session = _StreamingSession(this, controller);
+      _session = session;
+      _mode = _Mode.streaming;
+      await _beginCapture(onData: session.onAudio);
+    } catch (e, st) {
+      _session = null;
+      _mode = _Mode.idle;
+      controller.addError(e, st);
+      await controller.close();
+    }
   }
 
-  /// Test microphone access
+  /// Stops live transcription after transcribing the audio still buffered.
+  Future<void> stopStreamingTranscription() async {
+    final session = _session;
+    if (session == null) return;
+    _session = null;
+    try {
+      await _finishCapture();
+      await session.finish();
+    } finally {
+      _mode = _Mode.idle;
+    }
+  }
+
+  /// Whether microphone permission is (or can be) granted.
   Future<bool> testMicrophoneAccess() async {
     try {
-      final hasPermission = await _audioRecorder.hasPermission();
-      if (!hasPermission) {
-        return false;
-      }
-
-      // Try a quick recording test
-      final tempDir = await getTemporaryDirectory();
-      final testPath = '${tempDir.path}/mic_test.wav';
-
-      await _audioRecorder.start(
-        const RecordConfig(
-          encoder: AudioEncoder.wav,
-          sampleRate: 16000,
-          bitRate: 128000,
-          numChannels: 1,
-        ),
-        path: testPath,
-      );
-
-      await Future.delayed(const Duration(milliseconds: 500));
-
-      final recordedPath = await _audioRecorder.stop();
-
-      if (recordedPath != null) {
-        final testFile = File(recordedPath);
-        final exists = await testFile.exists();
-        if (exists) {
-          await testFile.delete();
-        }
-        return exists;
-      }
-
-      return false;
+      return await _micRecorder.hasPermission();
     } catch (e) {
-      print('Microphone test failed: $e');
+      ToolkitLog.warning(_tag, 'Microphone check failed', e);
       return false;
     }
   }
 
-  /// Check if service is initialized
-  void _checkInitialized() {
-    if (!_isInitialized || _asrEngine == null) {
-      throw InferenceException('ASR service not initialized');
+  /// Stops any capture, unloads an owned model and releases the recorder.
+  Future<void> dispose() async {
+    try {
+      if (isStreaming) {
+        await stopStreamingTranscription();
+      } else if (isRecording) {
+        await _finishCapture();
+      }
+    } catch (e) {
+      ToolkitLog.warning(_tag, 'Error while stopping capture', e);
+    }
+    _mode = _Mode.idle;
+    await _releaseEngine();
+    await _recorder?.dispose();
+    _recorder = null;
+  }
+
+  PcmRecorder get _micRecorder => _recorder ??= RecordPcmRecorder();
+
+  SpeechRecognizer _requireRecognizer() =>
+      _recognizer ??
+      (throw const InferenceException('ASR service not initialized'));
+
+  void _requireIdle() {
+    if (_mode != _Mode.idle) {
+      throw InferenceException('Already ${_mode.name}');
     }
   }
 
-  // Getters
-  bool get isInitialized => _isInitialized;
-  bool get isRecording => _isRecording;
-  bool get isStreamingMode => _isStreamingMode;
-  ASRModelType? get modelType => _currentModelType;
-  String? get currentModelPath => _currentModelPath;
-  ASRConfig get config => _config;
-
-  /// Dispose resources
-  Future<void> dispose() async {
-    print('🎤 Disposing ASR Service...');
-
-    // Stop any ongoing operations
-    _stopStreamingTranscription();
-
-    if (_isRecording) {
-      try {
-        await _audioRecorder.stop();
-      } catch (e) {
-        print('Warning: Error stopping recording during dispose: $e');
-      }
-      _isRecording = false;
+  Future<void> _releaseEngine() async {
+    if (_ownsRecognizer) {
+      final engine = _recognizer;
+      _recognizer = null;
+      _modelPath = null;
+      if (engine is AsrEngine) await engine.unloadModel();
     }
+  }
 
-    // Dispose ASR engine
-    if (_asrEngine != null) {
-      await _asrEngine!.unloadModel();
-      _asrEngine = null;
+  /// Marks the service as recording and starts the recorder.
+  Future<void> _startCapture({void Function(Uint8List bytes)? onData}) async {
+    _mode = _Mode.recording;
+    try {
+      await _beginCapture(onData: onData);
+    } catch (_) {
+      _mode = _Mode.idle;
+      rethrow;
     }
+  }
 
-    // Reset state
-    _isInitialized = false;
-    _currentModelPath = null;
-    _currentModelType = null;
-    _isStreamingMode = false;
-    _audioBuffer.clear();
+  Future<void> _beginCapture({void Function(Uint8List bytes)? onData}) async {
+    final recorder = _micRecorder;
+    if (!await recorder.hasPermission()) {
+      throw const InferenceException('Microphone permission not granted');
+    }
+    final stream = await recorder.start(_config.sampleRate);
+    _capture = _Capture(stream, onData);
+  }
 
-    print('✅ ASR Service disposed');
+  /// Stops the recorder and returns all PCM16 captured since [_beginCapture].
+  Future<Uint8List> _finishCapture() async {
+    final capture = _capture;
+    _capture = null;
+    if (capture == null) return Uint8List(0);
+    await _micRecorder.stop();
+    return capture.finish();
   }
 }
 
-/// ASR Configuration class
-class ASRConfig {
-  final int sampleRate;
-  final int bitRate;
-  final int streamingIntervalMs;
-  final int maxTokens;
-  final bool verbose;
-  final double confidenceThreshold;
-  final bool enableVAD;
-  final Duration vadSilenceTimeout;
-  final double vadSilenceThreshold;
-
-  const ASRConfig({
-    this.sampleRate = 16000,
-    this.bitRate = 256000,
-    this.streamingIntervalMs = 500,
-    this.maxTokens = 1024,
-    this.verbose = false,
-    this.confidenceThreshold = 0.5,
-    this.enableVAD = false,
-    this.vadSilenceTimeout = const Duration(seconds: 3),
-    this.vadSilenceThreshold = 0.01,
-  });
-
-  factory ASRConfig.defaultConfig() => const ASRConfig();
-
-  // Fixed the factory constructor syntax
-  factory ASRConfig.highQuality() => const ASRConfig(
-    sampleRate: 16000,
-    bitRate: 320000,
-    streamingIntervalMs: 250, // Fixed: use colon instead of equals
-    maxTokens: 2048,
-    confidenceThreshold: 0.7,
-    verbose: true,
-  );
-
-  factory ASRConfig.lowLatency() => const ASRConfig(
-    sampleRate: 16000,
-    bitRate: 128000,
-    streamingIntervalMs: 100,
-    maxTokens: 512,
-    confidenceThreshold: 0.3,
-  );
-
-  factory ASRConfig.mobile() => const ASRConfig(
-    sampleRate: 16000,
-    bitRate: 192000,
-    streamingIntervalMs: 500,
-    maxTokens: 1024,
-    confidenceThreshold: 0.5,
-    enableVAD: true,
-    vadSilenceTimeout: Duration(seconds: 2),
-  );
-
-  factory ASRConfig.streaming() => const ASRConfig(
-    sampleRate: 16000,
-    bitRate: 256000,
-    streamingIntervalMs: 200,
-    maxTokens: 1024,
-    confidenceThreshold: 0.4,
-    enableVAD: true,
-  );
-
-  ASRConfig copyWith({
-    int? sampleRate,
-    int? bitRate,
-    int? streamingIntervalMs,
-    int? maxTokens,
-    bool? verbose,
-    double? confidenceThreshold,
-    bool? enableVAD,
-    Duration? vadSilenceTimeout,
-    double? vadSilenceThreshold,
-  }) {
-    return ASRConfig(
-      sampleRate: sampleRate ?? this.sampleRate,
-      bitRate: bitRate ?? this.bitRate,
-      streamingIntervalMs: streamingIntervalMs ?? this.streamingIntervalMs,
-      maxTokens: maxTokens ?? this.maxTokens,
-      verbose: verbose ?? this.verbose,
-      confidenceThreshold: confidenceThreshold ?? this.confidenceThreshold,
-      enableVAD: enableVAD ?? this.enableVAD,
-      vadSilenceTimeout: vadSilenceTimeout ?? this.vadSilenceTimeout,
-      vadSilenceThreshold: vadSilenceThreshold ?? this.vadSilenceThreshold,
+/// Accumulates the PCM16 chunks of one recording session.
+class _Capture {
+  _Capture(Stream<Uint8List> stream, void Function(Uint8List)? onData) {
+    _subscription = stream.listen(
+      (bytes) {
+        _pcm.add(bytes);
+        onData?.call(bytes);
+      },
+      onError:
+          (Object e, StackTrace st) =>
+              ToolkitLog.warning(_tag, 'Recorder stream error', e),
+      onDone: _done.complete,
     );
+  }
+
+  final BytesBuilder _pcm = BytesBuilder(copy: false);
+  final Completer<void> _done = Completer<void>();
+  late final StreamSubscription<Uint8List> _subscription;
+
+  Future<Uint8List> finish() async {
+    await _done.future.timeout(const Duration(seconds: 1), onTimeout: () {});
+    await _subscription.cancel();
+    return _pcm.takeBytes();
+  }
+}
+
+/// One live-transcription run: windows the incoming audio, transcribes the
+/// windows one at a time and emits only text not already emitted.
+class _StreamingSession {
+  _StreamingSession(this._service, this._out)
+    : _windower = PcmWindower(
+        windowSamples: _service._config.chunkSamples,
+        overlapSamples: _service._config.overlapSamples,
+      ),
+      _vad = VoiceActivityDetector(
+        threshold: _service._config.vadSilenceThreshold,
+      );
+
+  final ASRService _service;
+  final StreamController<String> _out;
+  final PcmWindower _windower;
+  final VoiceActivityDetector _vad;
+  final TranscriptAccumulator _transcript = TranscriptAccumulator();
+  Future<void> _work = Future.value();
+
+  void onAudio(Uint8List bytes) {
+    _windower.add(bytes);
+    for (
+      var w = _windower.takeWindow();
+      w != null;
+      w = _windower.takeWindow()
+    ) {
+      _enqueue(w);
+    }
+  }
+
+  /// Transcribes the audio left in the buffer, then closes the stream.
+  Future<void> finish() async {
+    final rest = _windower.flush(
+      minNewSamples: _service._config.sampleRate ~/ 2,
+    );
+    if (rest != null) _enqueue(rest);
+    await _work;
+    if (!_out.isClosed) await _out.close();
+  }
+
+  void _enqueue(Uint8List window) {
+    _work = _work.then((_) => _transcribe(window));
+  }
+
+  Future<void> _transcribe(Uint8List window) async {
+    if (_out.isClosed) return;
+    if (_service._config.enableVAD &&
+        !_vad.containsSpeech(pcm16ToFloat(window))) {
+      return;
+    }
+    try {
+      final text = await _service.transcribeBytes(
+        window,
+        format: AudioFormat.pcm16,
+      );
+      if (!isMeaningfulTranscript(text)) return;
+      final fresh = _transcript.add(text);
+      if (fresh.isNotEmpty && !_out.isClosed) _out.add(fresh);
+    } catch (e) {
+      ToolkitLog.warning(_tag, 'Streaming window failed', e);
+    }
   }
 }

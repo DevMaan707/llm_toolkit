@@ -7,12 +7,12 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   final TabController tabController;
 
   const CustomAppBar({
-    Key? key,
+    super.key,
     required this.title,
     required this.onDebugToggle,
     required this.showDebugPanel,
     required this.tabController,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -30,7 +30,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF1E3A8A).withOpacity(0.2),
+            color: const Color(0xFF1E3A8A).withValues(alpha: 0.2),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -50,10 +50,10 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.15),
+                      color: Colors.white.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
-                        color: Colors.white.withOpacity(0.2),
+                        color: Colors.white.withValues(alpha: 0.2),
                         width: 1,
                       ),
                     ),
@@ -85,7 +85,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w500,
-                            color: Colors.white.withOpacity(0.8),
+                            color: Colors.white.withValues(alpha: 0.8),
                             letterSpacing: 0.3,
                           ),
                         ),
@@ -121,23 +121,23 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
               height: 44,
               margin: const EdgeInsets.symmetric(horizontal: 16),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.1),
+                color: Colors.white.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(
-                  color: Colors.white.withOpacity(0.2),
+                  color: Colors.white.withValues(alpha: 0.2),
                   width: 1,
                 ),
               ),
               child: TabBar(
                 controller: tabController,
                 indicator: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
+                  color: Colors.white.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 indicatorPadding: const EdgeInsets.all(2),
                 dividerColor: Colors.transparent,
                 labelColor: Colors.white,
-                unselectedLabelColor: Colors.white.withOpacity(0.7),
+                unselectedLabelColor: Colors.white.withValues(alpha: 0.7),
                 labelStyle: const TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: 12,
@@ -172,10 +172,13 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
       decoration: BoxDecoration(
         color:
             isActive
-                ? Colors.white.withOpacity(0.2)
-                : Colors.white.withOpacity(0.1),
+                ? Colors.white.withValues(alpha: 0.2)
+                : Colors.white.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.white.withOpacity(0.2), width: 1),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.2),
+          width: 1,
+        ),
       ),
       child: Material(
         color: Colors.transparent,
@@ -189,7 +192,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
               color:
                   isActive && activeColor != null
                       ? activeColor
-                      : Colors.white.withOpacity(0.9),
+                      : Colors.white.withValues(alpha: 0.9),
               size: 16,
             ),
           ),

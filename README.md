@@ -1,844 +1,165 @@
 # LLM Toolkit
 
-A comprehensive Flutter SDK for on-device Large Language Models, Speech Recognition, and RAG (Retrieval-Augmented Generation) capabilities.
+On-device AI for Flutter: run LLMs, vision models, speech recognition and embeddings locally, find and download models, and build chat, RAG and tool-calling apps on top — with no server.
 
-## 🚀 Features
+## Features
 
-- **Multi-Engine Support**: Llama (GGUF), Gemma (TFLite), Generic TFLite models
-- **Speech Recognition**: TFLite ASR with Whisper support
-- **Model Discovery**: Search and download models from Hugging Face
-- **RAG Support**: Retrieval-Augmented Generation with embeddings
-- **Streaming Inference**: Real-time text generation and speech transcription
-- **Cross-Platform**: iOS, Android, Windows, macOS, Linux
-- **Memory Optimized**: Adaptive configurations for mobile devices
+| Area | What you get |
+|---|---|
+| **Engines** | `llama` (GGUF via llama.cpp), `litert` (Gemma and others via LiteRT-LM / `flutter_edge_ai`), `asr` (Whisper TFLite). Engines are plugins: implement a capability interface and `registerEngine` it. |
+| **Capabilities** | text generation, chat, vision, embeddings, speech-to-text, plus extension points for text-to-speech, **image generation** and **video generation** engines |
+| **Model discovery** | Hugging Face (filters, quantisation and size parsing, "best file for my RAM"), Ollama, local folders |
+| **Downloads** | resumable (HTTP Range), pause/cancel, speed/ETA, SHA-256 verification, on-disk `ModelStore` |
+| **Chat** | `ChatSession` with history, context trimming, regenerate/undo, usage stats, prompt templates (ChatML, Llama 3, Gemma, Mistral, Phi-3, Qwen, DeepSeek), JSON save/restore |
+| **Structured output** | JSON-schema builder, robust JSON extraction/repair, validation with retry |
+| **Tools** | function-calling definitions, call parsing, an agent loop (`ToolRunner`) |
+| **RAG** | chunkers (sentence, paragraph, recursive, markdown), in-memory and file-backed vector stores, hybrid BM25 + vector, MMR, cited answers |
+| **Speech** | Whisper preprocessing, VAD, streaming transcription with overlap de-duplication |
 
-## 📦 Installation
+Platforms follow the underlying runtimes: Android, iOS, macOS, Linux and Windows (engine support varies).
 
-Add to your `pubspec.yaml`:
+## Install
 
 ```yaml
 dependencies:
-  llm_toolkit: ^1.0.0
-
-  # Required dependencies
-  flutter_gemma: ^0.2.0
-  llama_cpp_dart: ^0.1.0
-  tflite_flutter: ^0.10.0
-  record: ^5.0.0
-  path_provider: ^2.0.0
-  dio: ^5.0.0
-  fftea: ^2.0.0
+  llm_toolkit: ^0.1.0
 ```
 
-## 🔧 Setup
+Android needs `INTERNET` (downloads) and `RECORD_AUDIO` (speech); iOS needs `NSMicrophoneUsageDescription`. LiteRT requires Android `minSdk 30`. The llama engine loads llama.cpp through `llama_cpp_dart`; see its README for bundling native libraries, or pass `extra: {'libraryPath': ...}` in `InferenceConfig`.
 
-### Android
-Add to `android/app/src/main/AndroidManifest.xml`:
-```xml
-<uses-permission android:name="android.permission.RECORD_AUDIO" />
-<uses-permission android:name="android.permission.INTERNET" />
-<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
-```
-
-### iOS
-Add to `ios/Runner/Info.plist`:
-```xml
-<key>NSMicrophoneUsageDescription</key>
-<string>This app needs microphone access for speech recognition</string>
-```
-
-## 🚀 Quick Start
-
-### 1. Initialize the Toolkit
+## Quick start
 
 ```dart
-import 'package:llm_toolkit/llm_toolkit.dart';
+final toolkit = LLMToolkit.instance
+  ..initialize(huggingFaceApiKey: 'hf_...'); // key optional
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+// 1. Find and download a model
+final models = await toolkit.searchModels('qwen2.5 1.5b instruct', formats: {ModelFormat.gguf});
+final file = models.first.recommendedFileFor(3 << 30)!;
+final path = await toolkit.downloadModel(models.first, file.filename,
+    onProgress: (p) => print('${(p * 100).round()}%'));
 
-  // Initialize with optional Hugging Face API key
-  LLMToolkit.instance.initialize(
-    huggingFaceApiKey: 'your_hf_token_here', // Optional
-    defaultConfig: InferenceConfig.mobile(),
-  );
+// 2. Load it (engine is picked from the file)
+await toolkit.loadModel(path, config: const InferenceConfig.mobile());
 
-  runApp(MyApp());
+// 3. Chat
+final chat = toolkit.createChat(systemPrompt: 'You are concise.');
+await for (final token in chat.send('Why is the sky blue?')) {
+  stdout.write(token);
 }
+print(chat.lastUsage); // tokens/sec, time to first token, ...
 ```
 
-### 2. Search and Download Models
+## Structured output and tools
 
 ```dart
-class ModelManager {
-  Future<void> searchAndDownloadModel() async {
-    try {
-      // Search for models
-      final models = await LLMToolkit.instance.searchModels(
-        'Llama 3.2 1B',
-        limit: 10,
-        onlyCompatible: true,
-      );
+final schema = JsonSchema.object(properties: {
+  'city': JsonSchema.string(),
+  'temperature_c': JsonSchema.number(),
+}, required: ['city', 'temperature_c']);
 
-      print('Found ${models.length} models');
-
-      if (models.isNotEmpty) {
-        final model = models.first;
-        final ggufFiles = model.ggufFiles;
-
-        if (ggufFiles.isNotEmpty) {
-          // Download the model
-          final modelPath = await LLMToolkit.instance.downloadModel(
-            model,
-            ggufFiles.first.filename,
-            onProgress: (progress) {
-              print('Download progress: ${(progress * 100).toInt()}%');
-            },
-          );
-
-          print('Model downloaded to: $modelPath');
-        }
-      }
-    } catch (e) {
-      print('Error: $e');
-    }
-  }
-}
+final data = await generateStructured<Map<String, dynamic>>(
+  engine, prompt: 'Weather in Paris, as JSON', schema: schema);
 ```
-
-## 💬 Text Generation
-
-### Basic Text Generation
 
 ```dart
-class TextGenerationExample {
-  Future<void> basicGeneration() async {
-    try {
-      // Load a GGUF model (automatically detects Llama engine)
-      await LLMToolkit.instance.loadModel(
-        '/path/to/your/model.gguf',
-        config: InferenceConfig.mobile(),
-      );
-
-      // Generate text with streaming
-      final prompt = "What is artificial intelligence?";
-
-      await for (final chunk in LLMToolkit.instance.generateText(
-        prompt,
-        params: GenerationParams.balanced(),
-      )) {
-        print(chunk); // Print each token as it's generated
-      }
-
-    } catch (e) {
-      print('Generation error: $e');
-    }
-  }
-
-  Future<void> customGeneration() async {
-    // Custom generation parameters
-    final params = GenerationParams.custom(
-      maxTokens: 1000,
-      temperature: 0.8,
-      topP: 0.9,
-      topK: 40,
-      repeatPenalty: 1.1,
-    );
-
-    await for (final chunk in LLMToolkit.instance.generateText(
-      "Write a short story about a robot:",
-      params: params,
-    )) {
-      // Handle each generated token
-      setState(() {
-        generatedText += chunk;
-      });
-    }
-  }
-}
+final runner = ToolRunner(chat, [
+  ToolDefinition(
+    name: 'get_time',
+    description: 'Current time',
+    handler: (args) async => DateTime.now().toIso8601String(),
+  ),
+]);
+final result = await runner.run('What time is it?');
 ```
 
-### Chat Interface
+## RAG
+
+Load an embedding GGUF (for example `nomic-embed-text`) next to your chat model — several models can be loaded at once.
 
 ```dart
-class ChatExample {
-  InferenceModel? chatInstance;
+await toolkit.loadModel(embeddingPath);
+await toolkit.loadModel(chatPath);
 
-  Future<void> setupChat() async {
-    // Load Gemma model for chat
-    await LLMToolkit.instance.loadModel(
-      '/path/to/gemma-model.tflite',
-      config: InferenceConfig.mobile(),
-    );
-
-    // Create chat instance
-    chatInstance = await LLMToolkit.instance.createChatInstance(
-      temperature: 0.7,
-      topK: 30,
-    );
-  }
-
-  Future<String> sendMessage(String message) async {
-    if (chatInstance == null) return '';
-
-    final session = await chatInstance!.createSession();
-
-    // Add user message
-    await session.addQueryChunk(
-      Message.text(text: message, isUser: true)
-    );
-
-    String response = '';
-    await for (final chunk in session.getResponseAsync()) {
-      response += chunk;
-    }
-
-    await session.close();
-    return response;
-  }
-}
+final rag = toolkit.createRagPipeline(
+  store: FileVectorStore(Directory(dir)),
+);
+await rag.addDocument(RagDocument(id: 'manual', text: manualText));
+final answer = await rag.answer('How do I reset the device?');
+answer.stream.listen(stdout.write); // answer.sources holds the citations
 ```
 
-### Multimodal Generation (Gemma with Images)
+## Speech recognition
 
 ```dart
-class MultimodalExample {
-  Future<void> analyzeImage() async {
-    // Load multimodal Gemma model
-    await LLMToolkit.instance.loadModel(
-      '/path/to/gemma-multimodal.tflite',
-      config: InferenceConfig.multimodal(
-        maxTokens: 2048,
-        maxNumImages: 1,
-      ),
-    );
+await toolkit.loadModel(whisperTflitePath);
+final text = await toolkit.transcribe(wavBytes);
 
-    // Generate response with image
-    final imagePaths = ['/path/to/image.jpg'];
-    final prompt = "What do you see in this image?";
-
-    await for (final chunk in LLMToolkit.instance.generateMultimodalResponse(
-      prompt,
-      imagePaths,
-      params: GenerationParams.creative(),
-    )) {
-      print(chunk);
-    }
-  }
-}
+final asr = ASRService();                     // microphone, VAD, streaming
+await asr.initialize(whisperTflitePath);
+asr.startStreamingTranscription().listen(print);
 ```
 
-## 🎤 Speech Recognition (ASR)
+## Small devices
 
-### Basic Speech Recognition
+`LlamaEngine` plans each load from the GGUF header (layers, KV heads, sliding window, quantisation) and the memory the OS reports free. With `InferenceConfig.optimizeForDevice` (default) it picks the context size, KV cache precision (`f16`, then `q8_0`, then `q4_0` only when memory demands it), flash attention (needed for a quantised V cache), batch sizes and performance-core thread count, memory-maps the weights, and logs the plan. Anything you set explicitly (`contextSize`, `kvCacheType`, `flashAttention`, `batchSize`, `ubatchSize`, `threads`, `useMmap`, `useMlock`) wins; a requested context that cannot fit even with a `q4_0` cache is still reduced to avoid an out-of-memory kill.
 
 ```dart
-import 'package:llm_toolkit/src/services/asr_service.dart';
-
-class SpeechExample {
-  final ASRService _asrService = ASRService();
-
-  Future<void> setupASR() async {
-    // Initialize with Whisper model
-    await _asrService.initialize(
-      '/path/to/whisper-model.tflite',
-      config: ASRConfig.mobile(),
-    );
-  }
-
-  Future<String> transcribeFile() async {
-    // Transcribe audio file
-    final transcription = await _asrService.transcribeFile(
-      '/path/to/audio.wav'
-    );
-    return transcription;
-  }
-
-  Future<String> recordAndTranscribe() async {
-    // Record for 10 seconds then transcribe
-    final transcription = await _asrService.recordAndTranscribe(
-      Duration(seconds: 10)
-    );
-    return transcription;
-  }
-}
+final plan = await LlamaEngine.planFor(path); // before loading, e.g. for a UI warning
+print(plan); // ctx, KV type, estimated MB, reasons and warnings
 ```
 
-### Real-time Speech Recognition
+`q8_0` KV roughly halves cache memory with negligible quality loss; `q4_0` costs quality on some tasks. KV quantisation saves memory, not speed. Speculative/multi-token-prediction decoding is not available in the `llama_cpp_dart` binding. Memory figures are estimates (about 10%); free memory is only readable on Android and Linux. If the model embeds a chat template, `LlamaEngine.chatTemplate` exposes it and a matching built-in prompt format (ChatML, Gemma, Alpaca) is chosen when no family or `chatFormat` is set.
+
+## Image, video and other models
+
+On-device diffusion/video runtimes are not bundled. The toolkit defines `ImageGenerator`, `VideoGenerator` and `SpeechSynthesizer` and routes `toolkit.generateImage(...)`, `generateVideo(...)` and `synthesizeSpeech(...)` to any engine you register:
 
 ```dart
-class RealtimeSpeechExample {
-  final ASRService _asrService = ASRService();
-  StreamSubscription<String>? _subscription;
-
-  Future<void> startStreamingRecognition() async {
-    await _asrService.initialize(
-      '/path/to/whisper-model.tflite',
-      config: ASRConfig.streaming(),
-    );
-
-    // Start streaming transcription
-    _subscription = _asrService.startStreamingTranscription().listen(
-      (transcription) {
-        print('Real-time: $transcription');
-        // Update UI with live transcription
-      },
-      onError: (error) {
-        print('Streaming error: $error');
-      },
-    );
-  }
-
-  Future<void> stopStreamingRecognition() async {
-    await _asrService.stopStreamingTranscription();
-    _subscription?.cancel();
-  }
-}
+class MyDiffusionEngine implements InferenceEngine, ImageGenerator { /* ... */ }
+toolkit.registerEngine(MyDiffusionEngine());
+await toolkit.loadModel(path, engineId: 'my-diffusion');
+final png = await toolkit.generateImage(const ImageGenerationRequest(prompt: 'a lighthouse'));
 ```
 
-### Voice Activity Detection (VAD)
+## Any model: local or remote
+
+On-device GGUF runs through llama.cpp, so any architecture it supports (Qwen, DeepSeek, Kimi, Llama, Gemma, Mistral, Phi, GLM, SmolLM, LFM, Granite, ...) loads. Prompt templates exist for all of those families and are chosen from the model name or the template embedded in the GGUF (`PromptTemplate.forModelName`, `PromptTemplate.fromGgufTemplate`).
+
+Models too big for a phone (Kimi K2, DeepSeek-V3, GPT-class) or served on your LAN work through the same API:
 
 ```dart
-class VADExample {
-  Future<String> recordWithVAD() async {
-    final asrService = ASRService();
-    await asrService.initialize('/path/to/model.tflite');
+await toolkit.useRemote(RemoteModelPresets.deepSeek, model: 'deepseek-chat', apiKey: key);
+await toolkit.useRemote(RemoteModelPresets.openRouter, model: 'moonshotai/kimi-k2', apiKey: key);
+await toolkit.useOllama(model: 'qwen3:8b', baseUrl: 'http://192.168.1.20:11434');
 
-    // Record with automatic silence detection
-    final transcription = await asrService.recordWithVAD(
-      maxDuration: Duration(seconds: 30),
-      silenceTimeout: Duration(seconds: 3),
-      silenceThreshold: 0.01,
-    );
-
-    return transcription;
-  }
-}
+final chat = toolkit.createChat(); // identical from here on
 ```
 
-## 🔍 RAG (Retrieval-Augmented Generation)
+`OpenAiCompatibleEngine` also provides embeddings, vision, and (opt-in) speech and image endpoints, so remote Whisper/TTS/diffusion servers plug into `transcribe`, `synthesizeSpeech` and `generateImage`.
 
-### Setup RAG Engine
+## Android native libraries
 
-```dart
-import 'package:llm_toolkit/src/core/rag/rag_engine.dart';
-import 'package:llm_toolkit/src/core/rag/engines/llama_rag_engine.dart';
+`llama_cpp_dart` does not ship llama.cpp binaries, and its C bindings only match one llama.cpp revision (0.2.2 is generated against `4ffc47c`); a newer `libllama.so` has different struct layouts and will misbehave. `scripts/build_android_libs.sh` builds exactly the pinned revision (including `libmtmd.so`, which the package loads by default on Android) with the NDK:
 
-class RAGExample {
-  late RagEngine ragEngine;
-
-  Future<void> setupRAG() async {
-    ragEngine = LlamaRagEngine(
-      embeddingModelPath: '/path/to/embedding-model.gguf',
-      llmModelPath: '/path/to/llm-model.gguf',
-      libraryPath: 'libllama.so',
-    );
-
-    await ragEngine.initialize();
-  }
-
-  Future<void> addDocuments() async {
-    // Add documents to the knowledge base
-    await ragEngine.addDocument(
-      'doc1',
-      'Flutter is Google\'s UI toolkit for building natively compiled applications...',
-      {'source': 'flutter_docs', 'category': 'framework'},
-    );
-
-    await ragEngine.addDocument(
-      'doc2',
-      'Dart is a client-optimized language for fast apps on any platform...',
-      {'source': 'dart_docs', 'category': 'language'},
-    );
-  }
-
-  Future<RagResponse> askQuestion(String question) async {
-    final config = RagConfig(
-      maxRelevantChunks: 3,
-      maxTokens: 500,
-      temperature: 0.7,
-      similarityThreshold: 0.7,
-    );
-
-    final response = await ragEngine.query(question, config: config);
-
-    print('Answer: ${response.answer}');
-    print('Confidence: ${response.confidence}');
-    print('Sources: ${response.relevantChunks.length}');
-
-    return response;
-  }
-}
+```bash
+ANDROID_NDK_HOME=$HOME/Android/Sdk/ndk/27.2.12479018 scripts/build_android_libs.sh arm64-v8a x86_64
 ```
 
-## 🛠 Advanced Configuration
+The output goes to `example/android/app/src/main/jniLibs`; point `OUT_DIR` at your own app's `jniLibs` instead. When you bump `llama_cpp_dart`, bump `LLAMA_CPP_COMMIT` in the script with it.
 
-### Engine-Specific Configurations
+## Logging
 
-```dart
-class AdvancedConfig {
-  // Llama/GGUF Configuration
-  static InferenceConfig llamaConfig() => InferenceConfig(
-    nCtx: 4096,        // Context length
-    verbose: false,     // Debug output
-  );
+The library is silent below `warning`. `ToolkitLog.level = LogLevel.debug;` enables more, and `ToolkitLog.sink` redirects records to your own logger.
 
-  // Gemma Configuration
-  static InferenceConfig gemmaConfig() => InferenceConfig(
-    modelType: ModelType.gemmaIt,
-    preferredBackend: PreferredBackend.gpu,
-    maxTokens: 2048,
-    supportImage: false,
-  );
+## Status
 
-  // TFLite Configuration
-  static InferenceConfig tfliteConfig() => InferenceConfig(
-    preferredBackend: PreferredBackend.cpu,
-    maxTokens: 1024,
-  );
+Pure-Dart logic (chat, RAG, providers, downloads, audio DSP) is unit tested. Native engines (llama.cpp, LiteRT, TFLite) compile against their current APIs but need testing on real devices and models; ASR in particular assumes a Whisper TFLite model with `[1,80,3000]` float input.
 
-  // ASR Configuration
-  static ASRConfig asrConfig() => ASRConfig(
-    sampleRate: 16000,
-    bitRate: 256000,
-    streamingIntervalMs: 500,
-    maxTokens: 1024,
-    confidenceThreshold: 0.7,
-  );
-}
-```
+## Migrating from 0.0.x
 
-### Memory Management
+See [CHANGELOG.md](CHANGELOG.md). Highlights: `flutter_gemma` (discontinued) is replaced by `flutter_edge_ai`; `InferenceEngineType` and the Gemma/TFLite engines are gone in favour of string engine ids and capability interfaces; `SearchQuery(searchTerm:)` is now `text:`; RAG moved to `RagPipeline`.
 
-```dart
-class MemoryManagement {
-  Future<void> optimizeForDevice() async {
-    // Get device memory info
-    final recommendations = await LlamaInferenceEngine.getModelRecommendations();
+## License
 
-    print('Available memory: ${recommendations['availableMemoryMB']}MB');
-    print('Recommended quantization: ${recommendations['recommendedQuantization']}');
-    print('Recommended context: ${recommendations['recommendedNCtx']}');
-
-    // Configure based on device capabilities
-    InferenceConfig config;
-    if (recommendations['availableMemoryMB'] < 2048) {
-      config = InferenceConfig(
-        nCtx: 512,
-        maxTokens: 256,
-        verbose: false,
-      );
-    } else {
-      config = InferenceConfig(
-        nCtx: 2048,
-        maxTokens: 1024,
-        verbose: false,
-      );
-    }
-
-    await LLMToolkit.instance.loadModel('/path/to/model.gguf', config: config);
-  }
-}
-```
-
-## 🔄 Model Management
-
-### Model Detection and Loading
-
-```dart
-class ModelManagement {
-  Future<void> autoLoadModel(String modelPath) async {
-    // Automatic engine detection
-    final engineType = ModelDetector.instance.detectEngine(modelPath);
-    print('Detected engine: ${engineType.name}');
-
-    // Load with appropriate configuration
-    InferenceConfig config;
-    switch (engineType) {
-      case InferenceEngineType.llama:
-        config = InferenceConfig(nCtx: 2048, verbose: false);
-        break;
-      case InferenceEngineType.gemma:
-        config = InferenceConfig(
-          modelType: ModelType.gemmaIt,
-          preferredBackend: PreferredBackend.gpu,
-        );
-        break;
-      case InferenceEngineType.tflite:
-        config = InferenceConfig(preferredBackend: PreferredBackend.cpu);
-        break;
-      case InferenceEngineType.tfliteASR:
-        // Use ASR service instead
-        final asrService = ASRService();
-        await asrService.initialize(modelPath);
-        return;
-      default:
-        config = InferenceConfig.defaultConfig();
-    }
-
-    await LLMToolkit.instance.loadModel(modelPath, config: config);
-  }
-
-  Future<void> switchModels() async {
-    // Unload current model
-    await LLMToolkit.instance.dispose();
-
-    // Load new model
-    await LLMToolkit.instance.loadModel(
-      '/path/to/new-model.gguf',
-      config: InferenceConfig.mobile(),
-    );
-  }
-}
-```
-
-## 📱 UI Components
-
-### Download Progress Widget
-
-```dart
-class ModelDownloadScreen extends StatefulWidget {
-  @override
-  _ModelDownloadScreenState createState() => _ModelDownloadScreenState();
-}
-
-class _ModelDownloadScreenState extends State<ModelDownloadScreen> {
-  double downloadProgress = 0.0;
-  bool isDownloading = false;
-
-  Future<void> downloadModel(ModelInfo model, ModelFile file) async {
-    setState(() {
-      isDownloading = true;
-      downloadProgress = 0.0;
-    });
-
-    try {
-      final modelPath = await LLMToolkit.instance.downloadModel(
-        model,
-        file.filename,
-        onProgress: (progress) {
-          setState(() {
-            downloadProgress = progress;
-          });
-        },
-      );
-
-      // Auto-load the model after download
-      await LLMToolkit.instance.loadModel(modelPath);
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Model loaded successfully!')),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
-    } finally {
-      setState(() {
-        isDownloading = false;
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text('Model Download')),
-      body: Column(
-        children: [
-          if (isDownloading)
-            LinearProgressIndicator(value: downloadProgress),
-          // ... rest of UI
-        ],
-      ),
-    );
-  }
-}
-```
-
-### Chat Interface
-
-```dart
-class ChatScreen extends StatefulWidget {
-  @override
-  _ChatScreenState createState() => _ChatScreenState();
-}
-
-class _ChatScreenState extends State<ChatScreen> {
-  final TextEditingController _controller = TextEditingController();
-  final List<ChatMessage> _messages = [];
-  bool _isGenerating = false;
-
-  Future<void> sendMessage(String text) async {
-    if (text.isEmpty) return;
-
-    // Add user message
-    setState(() {
-      _messages.add(ChatMessage(text: text, isUser: true));
-      _isGenerating = true;
-    });
-
-    // Clear input
-    _controller.clear();
-
-    try {
-      String response = '';
-      await for (final chunk in LLMToolkit.instance.generateText(
-        text,
-        params: GenerationParams.balanced(),
-      )) {
-        setState(() {
-          response += chunk;
-          if (_messages.isNotEmpty && !_messages.last.isUser) {
-            _messages.last = ChatMessage(text: response, isUser: false);
-          } else {
-            _messages.add(ChatMessage(text: response, isUser: false));
-          }
-        });
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
-    } finally {
-      setState(() {
-        _isGenerating = false;
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text('LLM Chat')),
-      body: Column(
-        children: [
-          Expanded(
-            child: ListView.builder(
-              itemCount: _messages.length,
-              itemBuilder: (context, index) {
-                final message = _messages[index];
-                return ListTile(
-                  title: Text(message.text),
-                  leading: Icon(
-                    message.isUser ? Icons.person : Icons.smart_toy,
-                  ),
-                );
-              },
-            ),
-          ),
-          if (_isGenerating) LinearProgressIndicator(),
-          Padding(
-            padding: EdgeInsets.all(8.0),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _controller,
-                    decoration: InputDecoration(hintText: 'Type a message...'),
-                    onSubmitted: sendMessage,
-                  ),
-                ),
-                IconButton(
-                  icon: Icon(Icons.send),
-                  onPressed: () => sendMessage(_controller.text),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class ChatMessage {
-  final String text;
-  final bool isUser;
-
-  ChatMessage({required this.text, required this.isUser});
-}
-```
-
-## 🔧 Error Handling
-
-### Comprehensive Error Handling
-
-```dart
-class ErrorHandling {
-  Future<void> handleInferenceErrors() async {
-    try {
-      await LLMToolkit.instance.loadModel('/path/to/model.gguf');
-    } on InferenceException catch (e) {
-      if (e.message.contains('memory')) {
-        // Handle memory issues
-        print('Memory error: Try a smaller model or reduce context size');
-      } else if (e.message.contains('file')) {
-        // Handle file issues
-        print('File error: Check model path and permissions');
-      } else {
-        print('Inference error: ${e.message}');
-      }
-    } on ModelProviderException catch (e) {
-      print('Model provider error: ${e.message}');
-    } on LLMToolkitException catch (e) {
-      print('General toolkit error: ${e.message}');
-    } catch (e) {
-      print('Unexpected error: $e');
-    }
-  }
-
-  Future<void> handleASRErrors() async {
-    final asrService = ASRService();
-
-    try {
-      await asrService.initialize('/path/to/whisper-model.tflite');
-    } on InferenceException catch (e) {
-      if (e.message.contains('permission')) {
-        print('Microphone permission required');
-      } else if (e.message.contains('model')) {
-        print('ASR model loading failed');
-      } else {
-        print('ASR error: ${e.message}');
-      }
-    }
-  }
-}
-```
-
-## 📊 Performance Monitoring
-
-### Monitor Inference Performance
-
-```dart
-class PerformanceMonitoring {
-  Future<void> monitorPerformance() async {
-    // Llama engine debug info
-    final llamaEngine = LlamaInferenceEngine();
-    llamaEngine.printDebugInfo();
-
-    final status = llamaEngine.getDebugStatus();
-    print('Llama status: $status');
-
-    // ASR performance metrics
-    final asrService = ASRService();
-    final metrics = asrService.getPerformanceMetrics();
-    print('ASR metrics: $metrics');
-
-    // Memory recommendations
-    final recommendations = await LlamaInferenceEngine.getModelRecommendations();
-    print('Memory recommendations: $recommendations');
-  }
-}
-```
-
-## 🚀 Production Best Practices
-
-### 1. Resource Management
-
-```dart
-class ResourceManagement {
-  @override
-  void dispose() {
-    // Always dispose resources
-    LLMToolkit.instance.dispose();
-    super.dispose();
-  }
-
-  Future<void> backgroundTask() async {
-    try {
-      // Your inference code
-    } finally {
-      // Ensure cleanup even if error occurs
-      await LLMToolkit.instance.dispose();
-    }
-  }
-}
-```
-
-### 2. Model Validation
-
-```dart
-class ModelValidation {
-  Future<bool> validateModel(String modelPath) async {
-    try {
-      // Check if model file exists and is valid
-      final isValid = await LlamaInferenceEngine.validateGGUFFile(modelPath);
-      return isValid;
-    } catch (e) {
-      print('Model validation failed: $e');
-      return false;
-    }
-  }
-}
-```
-
-### 3. Progressive Loading
-
-```dart
-class ProgressiveLoading {
-  Future<void> loadModelWithFallback(List<String> modelPaths) async {
-    for (final modelPath in modelPaths) {
-      try {
-        await LLMToolkit.instance.loadModel(modelPath);
-        print('Successfully loaded: $modelPath');
-        return;
-      } catch (e) {
-        print('Failed to load $modelPath: $e');
-        continue;
-      }
-    }
-    throw Exception('No models could be loaded');
-  }
-}
-```
-
-## 📚 API Reference
-
-### Core Classes
-
-- **`LLMToolkit`**: Main singleton class for all operations
-- **`InferenceConfig`**: Configuration for model loading
-- **`GenerationParams`**: Parameters for text generation
-- **`ASRService`**: Speech recognition service
-- **`RagEngine`**: RAG functionality interface
-
-### Configuration Classes
-
-- **`ASRConfig`**: ASR-specific configuration
-- **`RagConfig`**: RAG-specific configuration
-- **`ModelInfo`**: Model metadata and files
-- **`SearchQuery`**: Model search parameters
-
-### Exception Classes
-
-- **`LLMToolkitException`**: Base exception class
-- **`InferenceException`**: Inference-related errors
-- **`ModelProviderException`**: Model provider errors
-- **`DownloadException`**: Download-related errors
-
-## 🤝 Contributing
-
-Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md) for details.
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🆘 Support
-
-- 📧 Email: support@llmtoolkit.dev
-- 💬 Discord: [Join our community](https://discord.gg/llmtoolkit)
-- 📖 Documentation: [Full docs](https://docs.llmtoolkit.dev)
-- 🐛 Issues: [GitHub Issues](https://github.com/yourorg/llm_toolkit/issues)
-
-## 🙏 Acknowledgments
-
-- Flutter Gemma team for multimodal support
-- Llama.cpp community for GGUF inference
-- Hugging Face for model hosting
-- TensorFlow Lite team for mobile optimization
-
----
-
-Built with ❤️ for the Flutter community
+MIT
