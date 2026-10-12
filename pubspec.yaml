@@ -1,6 +1,6 @@
 name: llm_toolkit
 description: "On-device AI toolkit for Flutter: LLM chat (GGUF via llama.cpp, LiteRT-LM), vision, Whisper speech recognition, embeddings and RAG, Hugging Face/Ollama model discovery and resumable downloads, structured output and tool calling."
-version: 0.1.0
+version: 0.1.1
 homepage: https://github.com/DevMaan707/llm_toolkit
 repository: https://github.com/DevMaan707/llm_toolkit
 issue_tracker: https://github.com/DevMaan707/llm_toolkit/issues

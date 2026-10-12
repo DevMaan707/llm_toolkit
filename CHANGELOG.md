@@ -1,5 +1,11 @@
 # LLM Toolkit SDK Changelog
 
+## Version 0.1.1
+
+### Added
+- `VoiceAssistant` and `LLMToolkit.createVoiceAssistant`: speech-in/speech-out turns that speak the reply sentence by sentence while it is generated (`respondToText`, `respondToAudio`, hands-free `listen`, `interrupt`), with `VoiceEvent` types.
+- `SentenceSplitter`: token stream to speakable sentences, with markdown stripped.
+
 ## Version 0.1.0
 
 A ground-up modernisation. **Breaking release.**

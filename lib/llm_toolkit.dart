@@ -19,6 +19,7 @@ import 'src/core/providers/ollama/ollama_provider.dart';
 import 'src/core/search_query.dart';
 import 'src/exceptions/llm_toolkit_exceptions.dart';
 import 'src/rag/rag.dart';
+import 'src/voice/voice_assistant.dart';
 
 export 'src/chat/chat.dart';
 export 'src/core/base_provider.dart';
@@ -43,6 +44,8 @@ export 'src/core/storage/model_store.dart';
 export 'src/exceptions/llm_toolkit_exceptions.dart';
 export 'src/rag/rag.dart';
 export 'src/services/asr_service.dart';
+export 'src/voice/sentence_splitter.dart';
+export 'src/voice/voice_assistant.dart';
 
 /// Entry point tying engines, providers and the chat/RAG layers together.
 ///
@@ -248,6 +251,17 @@ class LLMToolkit {
       contextSize: contextSize,
     );
   }
+
+  /// A speech-in, speech-out assistant over [chat] using the loaded
+  /// text-to-speech model.
+  VoiceAssistant createVoiceAssistant(ChatSession chat, {String? voice}) =>
+      VoiceAssistant(
+        chat: chat,
+        synthesizer: _manager.require<SpeechSynthesizer>(
+          ModelCapability.textToSpeech,
+        ),
+        voice: voice,
+      );
 
   /// A RAG pipeline using the loaded embedding model (and, if present, the
   /// loaded text model for answers). Defaults to an in-memory store.

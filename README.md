@@ -33,6 +33,7 @@
 - [Structured output and tools](#structured-output-and-tools)
 - [Retrieval-augmented generation](#retrieval-augmented-generation)
 - [Speech](#speech)
+- [Voice assistant](#voice-assistant)
 - [Remote models](#remote-models)
 - [Running well on small devices](#running-well-on-small-devices)
 - [Custom engines: image and video](#custom-engines-image-and-video)
@@ -46,7 +47,7 @@
 
 ```yaml
 dependencies:
-  llm_toolkit: ^0.1.0
+  llm_toolkit: ^0.1.1
 ```
 
 ```dart
@@ -226,6 +227,35 @@ Offline models are cut into utterances by Silero VAD when you pass `InferenceCon
 More models are listed in the [sherpa-onnx model list](https://k2-fsa.github.io/sherpa/onnx/pretrained_models/). The Silero VAD model, `silero_vad.onnx`, is in the [`asr-models` release](https://github.com/k2-fsa/sherpa-onnx/releases/tag/asr-models).
 
 </details>
+
+## Voice assistant
+
+`VoiceAssistant` connects recognition, chat and synthesis: the reply is spoken sentence by sentence while it is still being generated. It produces WAV audio and events; playing the audio is up to your app.
+
+```dart
+await toolkit.loadModel(llmPath);                          // chat
+await toolkit.loadModel('/models/vits-piper-en_US-amy-low'); // text-to-speech
+final chat = toolkit.createChat(systemPrompt: 'Answer in one or two sentences.');
+final assistant = toolkit.createVoiceAssistant(chat, voice: '0');
+
+// From typed text or already recognised text
+await for (final e in assistant.respondToText('Tell me a fact')) {
+  switch (e) {
+    case VoiceReplyToken(:final text): ui.append(text);
+    case VoiceSpeech(:final wav): player.enqueue(wav);   // play in order
+    case VoiceTurnDone(:final usage): ui.finish(usage);
+    case VoiceWarning(:final message): log(message);
+    default: break;
+  }
+}
+
+// Hands-free: microphone -> streaming recognizer -> chat -> speech
+assistant.listen(recognizer: sherpaAsrEngine).listen(handleEvent);
+
+assistant.interrupt(); // stop the current reply
+```
+
+Events: `VoicePartialTranscript`, `VoiceTranscript`, `VoiceReplyToken`, `VoiceSpeech`, `VoiceTurnDone`, `VoiceWarning`. `respondToAudio(bytes, recognizer)` handles a recorded clip. While a reply is produced the microphone is buffered, so use headphones or pause capture while audio plays to avoid the assistant hearing itself.
 
 ## Remote models
 
