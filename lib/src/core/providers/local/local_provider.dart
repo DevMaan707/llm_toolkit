@@ -126,6 +126,7 @@ class LocalProvider extends BaseModelProvider {
       parameterCount: ModelNaming.parameterCount(name),
       quantization: modelFile.quantization,
       sizeBytes: stat.size,
+      runtime: format == ModelFormat.onnx ? null : detected.engineId,
     );
   }
 }

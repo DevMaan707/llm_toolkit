@@ -89,6 +89,7 @@ class OllamaProvider extends BaseModelProvider {
       provider: id,
       description: json['modelfile'] as String? ?? '',
       pipelineTag: PipelineTags.textGeneration,
+      runtime: EngineIds.ollama,
       library: 'ollama',
       license: license,
       parameterCount:
@@ -201,6 +202,7 @@ class OllamaProvider extends BaseModelProvider {
       provider: id,
       library: 'ollama',
       pipelineTag: PipelineTags.textGeneration,
+      runtime: EngineIds.ollama,
       lastModified: DateTime.tryParse(m['modified_at'] as String? ?? ''),
       sizeBytes: (m['size'] as num?)?.toInt(),
       parameterCount:

@@ -26,6 +26,10 @@ abstract final class HfParser {
     final card = json['cardData'] as Map<String, dynamic>? ?? const {};
     final gguf = json['gguf'] as Map<String, dynamic>?;
     final tags = [for (final t in json['tags'] as List? ?? const []) '$t'];
+    final siblings = [
+      for (final s in json['siblings'] as List? ?? const [])
+        s as Map<String, dynamic>,
+    ];
 
     return ModelInfo(
       id: id,
@@ -45,12 +49,37 @@ abstract final class HfParser {
       parameterCount:
           (gguf?['total'] as num?)?.toInt() ?? ModelNaming.parameterCount(name),
       contextLength: (gguf?['context_length'] as num?)?.toInt(),
+      bundle: ModelBundle.detect(tags, [
+        for (final s in siblings) s['rfilename'] as String? ?? '',
+      ]),
       files: [
-        for (final s in json['siblings'] as List? ?? const [])
-          if (_file(id, s as Map<String, dynamic>, endpoint) case final f?) f,
+        for (final s in siblings)
+          if (_file(id, s, endpoint) case final f?) f,
       ],
     );
   }
+
+  /// Files of a `tree` API listing (directories are skipped), any extension.
+  static List<ModelFile> treeFiles(
+    String id,
+    Iterable<Object?> entries, {
+    required String endpoint,
+  }) {
+    return [
+      for (final entry in entries)
+        if (entry case {'type': 'file', 'path': final String path})
+          ModelFile(
+            filename: path,
+            downloadUrl: resolveUrl(endpoint, id, path).toString(),
+            sizeBytes: _entrySize(entry as Map<String, dynamic>),
+            sha256: ((entry['lfs'] as Map?)?['oid'] as String?)?.toLowerCase(),
+          ),
+    ];
+  }
+
+  static int? _entrySize(Map<String, dynamic> entry) =>
+      ((entry['lfs'] as Map?)?['size'] as num? ?? entry['size'] as num?)
+          ?.toInt();
 
   static ModelFile? _file(String id, Map<String, dynamic> s, String endpoint) {
     final filename = s['rfilename'] as String?;

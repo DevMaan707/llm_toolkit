@@ -1,0 +1,109 @@
+{
+ "id": "csukuangfj/sherpa-onnx-moonshine-tiny-en-int8",
+ "author": "csukuangfj",
+ "downloads": 0,
+ "likes": 1,
+ "gated": false,
+ "lastModified": "2024-10-26T01:40:09.000Z",
+ "tags": [
+  "onnx",
+  "region:us"
+ ],
+ "siblings": [
+  {
+   "rfilename": ".gitattributes",
+   "blobId": "83cfd8dbb643612f79f25d84b65ac7e4b3c4fb7f",
+   "size": 1561
+  },
+  {
+   "rfilename": "LICENSE",
+   "blobId": "0cf49dc337ac33e85aa68f6ad5a9fd2ee62cbd52",
+   "size": 1071
+  },
+  {
+   "rfilename": "README.md",
+   "blobId": "8a0e893e5e374caae989bca628935620de76a962",
+   "size": 175
+  },
+  {
+   "rfilename": "cached_decode.int8.onnx",
+   "blobId": "658305e31800ed07f802a647768036983d3b5978",
+   "size": 45264830,
+   "lfs": {
+    "sha256": "2aff28bba6a03d8dcf5c9feac45462629bae37317442299f28115ad09da773f6",
+    "size": 45264830,
+    "pointerSize": 133
+   }
+  },
+  {
+   "rfilename": "encode.int8.onnx",
+   "blobId": "5c135300f497a10da78bc4b1f2347dd3c3be0a04",
+   "size": 18249187,
+   "lfs": {
+    "sha256": "8774dfba578de027ec6595c2c654a0836434489bc963a0db124a7f181f571acb",
+    "size": 18249187,
+    "pointerSize": 133
+   }
+  },
+  {
+   "rfilename": "preprocess.onnx",
+   "blobId": "1464028c4223834dc884051eb48fce27d975d38f",
+   "size": 6800738,
+   "lfs": {
+    "sha256": "f33addce61a143460fe753b5ee5b7db255e5140b5b779c065b94f6c83ff0bf4e",
+    "size": 6800738,
+    "pointerSize": 132
+   }
+  },
+  {
+   "rfilename": "test_wavs/0.wav",
+   "blobId": "f58b5dd584aceb425bb6c46e62d434a5e5a171eb",
+   "size": 212044,
+   "lfs": {
+    "sha256": "6bc58a4efdf20daac252b6b1502632601a71efe0308f6757dc1eda34891a7e4f",
+    "size": 212044,
+    "pointerSize": 131
+   }
+  },
+  {
+   "rfilename": "test_wavs/1.wav",
+   "blobId": "32f8e24ed1c40a1ea1039728b40742541b37716f",
+   "size": 534924,
+   "lfs": {
+    "sha256": "5143a6ba93c4b274e2c4ac22deb75c2c48936c853f0519add1de828b6c79cc5a",
+    "size": 534924,
+    "pointerSize": 131
+   }
+  },
+  {
+   "rfilename": "test_wavs/8k.wav",
+   "blobId": "b099744c4e1dfb756e5d8063df0e2c803d800702",
+   "size": 77244,
+   "lfs": {
+    "sha256": "f6f3c8b33e2534cdc154fe773ad2750f1f6a2ca5096179cdf037ae782456613e",
+    "size": 77244,
+    "pointerSize": 130
+   }
+  },
+  {
+   "rfilename": "test_wavs/trans.txt",
+   "blobId": "c3b9759d692309cba86e64e465e1a08220ee01c3",
+   "size": 449
+  },
+  {
+   "rfilename": "tokens.txt",
+   "blobId": "75a90190faccf21c06262649dc74544261e07f92",
+   "size": 436688
+  },
+  {
+   "rfilename": "uncached_decode.int8.onnx",
+   "blobId": "58c8d5e769d5a9c7636147589d7b9c21b5b560db",
+   "size": 53216096,
+   "lfs": {
+    "sha256": "216737000dd5881a17aa043f6bbd286add33e4c3b0ae257153e2ec15438bdc41",
+    "size": 53216096,
+    "pointerSize": 133
+   }
+  }
+ ]
+}

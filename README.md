@@ -8,7 +8,7 @@ On-device AI for Flutter: run LLMs, vision models, speech recognition and embedd
 |---|---|
 | **Engines** | `llama` (GGUF via llama.cpp), `litert` (Gemma and others via LiteRT-LM / `flutter_edge_ai`), `asr` (Whisper TFLite). Engines are plugins: implement a capability interface and `registerEngine` it. |
 | **Capabilities** | text generation, chat, vision, embeddings, speech-to-text, plus extension points for text-to-speech, **image generation** and **video generation** engines |
-| **Model discovery** | Hugging Face (filters, quantisation and size parsing, "best file for my RAM"), Ollama, local folders |
+| **Model discovery** | Hugging Face (task-aware search for text, vision, embedding, speech, image and video models; `runnableBy` tells which engine runs a result; whole-folder `downloadBundle` for sherpa-onnx), a verified `ModelCatalog` of phone-sized models per task, Ollama, local folders |
 | **Downloads** | resumable (HTTP Range), pause/cancel, speed/ETA, SHA-256 verification, on-disk `ModelStore` |
 | **Chat** | `ChatSession` with history, context trimming, regenerate/undo, usage stats, prompt templates (ChatML, Llama 3, Gemma, Mistral, Phi-3, Qwen, DeepSeek), JSON save/restore |
 | **Structured output** | JSON-schema builder, robust JSON extraction/repair, validation with retry |
@@ -38,6 +38,10 @@ final models = await toolkit.searchModels('qwen2.5 1.5b instruct', formats: {Mod
 final file = models.first.recommendedFileFor(3 << 30)!;
 final path = await toolkit.downloadModel(models.first, file.filename,
     onProgress: (p) => print('${(p * 100).round()}%'));
+
+// Speech models by task; `runnableBy` names the engine that can load a result
+final asr = await toolkit.searchModels('whisper', task: ModelTask.speechToText);
+final phoneFriendly = ModelCatalog.forDevice(ModelTask.textToSpeech, 3 << 30);
 
 // 2. Load it (engine is picked from the file)
 await toolkit.loadModel(path, config: const InferenceConfig.mobile());
@@ -100,6 +104,38 @@ await asr.initialize(whisperTflitePath);
 asr.startStreamingTranscription().listen(print);
 ```
 
+## Speech models (sherpa-onnx)
+
+`sherpa-asr` and `sherpa-tts` run the mobile-friendly speech models of [sherpa-onnx](https://k2-fsa.github.io/sherpa/onnx/): Whisper, Moonshine, NVIDIA Parakeet, Zipformer, SenseVoice, Paraformer (recognition, offline and streaming) and Kokoro, Piper/VITS, Kitten, Matcha (synthesis). Models are *folders*; the architecture is detected from the file names.
+
+```dart
+await toolkit.loadModel('/models/sherpa-onnx-whisper-tiny.en');  // routes to sherpa-asr
+final text = await toolkit.transcribe(wavBytes);      // WAV or 16 kHz PCM16
+
+final asr = SherpaAsrEngine();
+await asr.loadModel('/models/sherpa-onnx-streaming-zipformer-en-2023-06-26', const InferenceConfig.defaults());
+asr.transcribeStream(micPcmStream).listen(print);     // streaming models endpoint themselves
+```
+
+Offline models (Whisper, Parakeet, ...) are cut into utterances by Silero VAD when you pass `InferenceConfig(extra: {'vadModel': '/path/silero_vad.onnx'})`; without it the stream is transcribed as one text when it ends. Other `extra` keys: `language`, `task`, `numThreads`, `provider` (`cpu`, `xnnpack`, `nnapi`, `coreml`), `decodingMethod`, `preferInt8`, `streaming`. Recognition and synthesis run in a background isolate. Synthesis: `toolkit.synthesizeSpeech('Hello', voice: '3')` returns WAV bytes; `voice` is a speaker id, or a name when you pass `extra: {'speakerNames': [...]}`.
+
+Hugging Face repos that work (all under `csukuangfj/`; download the whole folder; more at the [k2-fsa model list](https://k2-fsa.github.io/sherpa/onnx/pretrained_models/)):
+
+| Kind | Repo |
+|---|---|
+| Whisper | `sherpa-onnx-whisper-tiny.en`, `-base.en`, `-small.en`, `-tiny`, `-base`, `-small` |
+| Moonshine | `sherpa-onnx-moonshine-tiny-en-int8`, `sherpa-onnx-moonshine-base-en-int8` |
+| Parakeet | `sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8`, `sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8` |
+| SenseVoice | `sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17` |
+| Zipformer | `sherpa-onnx-zipformer-small-en-2023-06-26`, `sherpa-onnx-streaming-zipformer-en-2023-06-26` |
+| Paraformer | `sherpa-onnx-paraformer-zh-2023-09-14`, `sherpa-onnx-streaming-paraformer-bilingual-zh-en` |
+| Kokoro | `kokoro-multi-lang-v1_0`, `kokoro-int8-multi-lang-v1_1` |
+| Piper / VITS | `vits-piper-en_US-amy-low` (and the other `vits-piper-*`), `vits-melo-tts-zh_en` |
+| Kitten | `kitten-nano-en-v0_1-fp16` |
+| Matcha | `matcha-icefall-en_US-ljspeech` (needs a vocoder such as `vocos-22khz-univ.onnx`, pass `extra: {'vocoder': path}`) |
+
+The Silero VAD model is `silero_vad.onnx` from the [sherpa-onnx `asr-models` release](https://github.com/k2-fsa/sherpa-onnx/releases/tag/asr-models).
+
 ## Small devices
 
 `LlamaEngine` plans each load from the GGUF header (layers, KV heads, sliding window, quantisation) and the memory the OS reports free. With `InferenceConfig.optimizeForDevice` (default) it picks the context size, KV cache precision (`f16`, then `q8_0`, then `q4_0` only when memory demands it), flash attention (needed for a quantised V cache), batch sizes and performance-core thread count, memory-maps the weights, and logs the plan. Anything you set explicitly (`contextSize`, `kvCacheType`, `flashAttention`, `batchSize`, `ubatchSize`, `threads`, `useMmap`, `useMlock`) wins; a requested context that cannot fit even with a `q4_0` cache is still reduced to avoid an out-of-memory kill.
@@ -154,7 +190,7 @@ The library is silent below `warning`. `ToolkitLog.level = LogLevel.debug;` enab
 
 ## Status
 
-Pure-Dart logic (chat, RAG, providers, downloads, audio DSP) is unit tested. Native engines (llama.cpp, LiteRT, TFLite) compile against their current APIs but need testing on real devices and models; ASR in particular assumes a Whisper TFLite model with `[1,80,3000]` float input.
+Pure-Dart logic (chat, RAG, providers, downloads, audio DSP) is unit tested. Sherpa Whisper (offline, with VAD), streaming Zipformer and Piper were run end to end on Linux x64; other architectures are configured from the sherpa API but untested. Native engines (llama.cpp, LiteRT, TFLite) compile against their current APIs but need testing on real devices and models; ASR in particular assumes a Whisper TFLite model with `[1,80,3000]` float input.
 
 ## Migrating from 0.0.x
 

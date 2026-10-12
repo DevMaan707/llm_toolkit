@@ -1,5 +1,8 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:llm_toolkit/src/core/config.dart';
+import 'package:llm_toolkit/src/core/inference/base_inference_engine.dart';
 import 'package:llm_toolkit/src/core/model_detector.dart';
 
 void main() {
@@ -42,5 +45,70 @@ void main() {
     expect(detector.detect('/models/Qwen3-8B.gguf').engineId, 'llama');
     expect(detector.detect('gemma.litertlm').engineId, 'litert');
     expect(detector.detect(r'C:\m\whisper-tiny.tflite').engineId, 'asr');
+  });
+
+  group('sherpa routing', () {
+    late Directory root;
+    setUp(() => root = Directory.systemTemp.createTempSync('detector'));
+    tearDown(() => root.deleteSync(recursive: true));
+
+    String folder(String name, List<String> files) {
+      final dir = Directory('${root.path}/$name')..createSync();
+      for (final f in files) {
+        File('${dir.path}/$f').writeAsBytesSync(const []);
+      }
+      return dir.path;
+    }
+
+    test('folders route by content', () {
+      final asr = detector.detect(
+        folder('anything', ['model.onnx', 'tokens.txt']),
+      );
+      expect(asr.engineId, 'sherpa-asr');
+      expect(asr.capabilities, {ModelCapability.speechToText});
+      final tts = detector.detect(
+        folder('voice-pack', ['model.onnx', 'voices.bin', 'tokens.txt']),
+      );
+      expect(tts.engineId, 'sherpa-tts');
+      expect(tts.capabilities, {ModelCapability.textToSpeech});
+    });
+
+    test('unreadable folders fall back to the name', () {
+      expect(
+        detector.detect(folder('kokoro-empty', const [])).engineId,
+        'sherpa-tts',
+      );
+      expect(detector.detect(folder('mystery', const [])).engineId, 'llama');
+    });
+
+    test('names route when the path is not a folder', () {
+      const asr = [
+        'sherpa-onnx-whisper-tiny.en',
+        'moonshine-tiny.onnx',
+        'nemo-parakeet-tdt-0.6b-v2-int8',
+        'streaming-zipformer-en',
+        'sherpa-onnx-sense-voice-zh-en',
+        'paraformer-zh',
+      ];
+      const tts = [
+        'kokoro-multi-lang-v1_0',
+        'vits-piper-en_US-amy-low',
+        'matcha-icefall-en_US-ljspeech',
+        'kokoro.onnx',
+      ];
+      for (final n in asr) {
+        expect(detector.detect('/m/$n').engineId, 'sherpa-asr', reason: n);
+      }
+      for (final n in tts) {
+        expect(detector.detect('/m/$n').engineId, 'sherpa-tts', reason: n);
+      }
+    });
+
+    test('other formats keep their engines', () {
+      expect(detector.detect('whisper-tiny.tflite').engineId, 'asr');
+      expect(detector.detect('whisper-large.bin').engineId, 'llama');
+      expect(detector.detect('piper-chat.gguf').engineId, 'llama');
+      expect(detector.detect('gemma.litertlm').engineId, 'litert');
+    });
   });
 }

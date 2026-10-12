@@ -16,7 +16,9 @@ A ground-up modernisation. **Breaking release.**
 - `OpenAiCompatibleEngine` and `OllamaEngine`: hosted/LAN models (Kimi, DeepSeek, Qwen, GPT-class, LM Studio, vLLM, OpenRouter) through the same capability interfaces, plus `RemoteModelPresets`.
 - Prompt templates for Kimi, GLM, SmolLM, LFM2, Granite, Command-R, OLMo, InternLM, MiniCPM, Yi and gpt-oss; template selection from the GGUF-embedded chat template.
 - `scripts/build_android_libs.sh` builds the llama.cpp revision matching `llama_cpp_dart` (the old committed binaries came from a different revision and lacked `libmtmd.so`).
+- `SherpaAsrEngine` / `SherpaTtsEngine` (`sherpa-asr`, `sherpa-tts`) on `sherpa_onnx`: Whisper, Moonshine, Parakeet, Zipformer, SenseVoice, Paraformer (offline and streaming) recognition with optional Silero VAD, and Kokoro, Piper/VITS, Kitten, Matcha synthesis; architecture auto-detected from model folders (`SherpaModelLayout.detect`), work done in a background isolate; `ModelDetector` routes sherpa folders and names.
 - `ToolkitLog` for pluggable logging.
+- Task-aware model discovery: `ModelTask` (from the Hub `pipeline_tag`), `SearchQuery(tasks:)`, `LLMToolkit.searchModels(task:)`, `ModelInfo.task`/`runnableBy`, `litert`/`tflite`/`onnx`/`gguf` Hub format filters, sherpa-onnx bundle detection, `BaseModelProvider.downloadBundle` (aggregate progress, per-file resume) and `ModelCatalog` with verified phone-sized ASR, TTS, LLM, vision and embedding models (heavy image models flagged as not runnable).
 - Test suite (250+ tests).
 
 ### Changed

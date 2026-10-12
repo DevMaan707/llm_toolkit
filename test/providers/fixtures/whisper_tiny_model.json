@@ -1,0 +1,56 @@
+{
+ "id": "litert-community/whisper-tiny",
+ "author": "litert-community",
+ "downloads": 9689,
+ "likes": 7,
+ "gated": false,
+ "lastModified": "2026-05-03T00:13:20.000Z",
+ "tags": [
+  "tflite",
+  "automatic-speech-recognition",
+  "base_model:openai/whisper-tiny",
+  "base_model:finetune:openai/whisper-tiny",
+  "license:apache-2.0",
+  "region:us"
+ ],
+ "pipeline_tag": "automatic-speech-recognition",
+ "cardData": {
+  "license": "apache-2.0",
+  "base_model": [
+   "openai/whisper-tiny"
+  ],
+  "pipeline_tag": "automatic-speech-recognition"
+ },
+ "siblings": [
+  {
+   "rfilename": ".gitattributes",
+   "blobId": "a6344aac8c09253b3b630fb776ae94478aa0275b",
+   "size": 1519
+  },
+  {
+   "rfilename": "README.md",
+   "blobId": "f4eafbf598acfaa8076767a8aa5b976758ee9044",
+   "size": 104
+  },
+  {
+   "rfilename": "whisper_tiny_30s_f32.tflite",
+   "blobId": "fdbfb76d03535219a42ac1154cc050315eb1e56a",
+   "size": 150979184,
+   "lfs": {
+    "sha256": "0c8f0e2a1855909a0c027b4ac3c586fdd299e2b47bf1a4fdab51191bca1e0e89",
+    "size": 150979184,
+    "pointerSize": 134
+   }
+  },
+  {
+   "rfilename": "whisper_tiny_30s_i8.tflite",
+   "blobId": "778524af8663aea237cbe0ee1bd7b6ffe856437d",
+   "size": 41116288,
+   "lfs": {
+    "sha256": "6748ac565a228c4a00b18d11ea1e2fd7cead3db6fba94e3f0bf35756b13ba4a9",
+    "size": 41116288,
+    "pointerSize": 133
+   }
+  }
+ ]
+}

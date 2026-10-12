@@ -12,6 +12,7 @@ import 'src/core/inference/inference_manager.dart';
 import 'src/core/inference/litert_engine.dart';
 import 'src/core/inference/llama_engine.dart';
 import 'src/core/inference/remote/remote.dart';
+import 'src/core/inference/sherpa/sherpa.dart';
 import 'src/core/model_info.dart';
 import 'src/core/providers/huggingface/hf_provider.dart';
 import 'src/core/providers/ollama/ollama_provider.dart';
@@ -29,6 +30,7 @@ export 'src/core/inference/gguf/gguf.dart';
 export 'src/core/inference/litert_engine.dart';
 export 'src/core/inference/llama_engine.dart';
 export 'src/core/inference/remote/remote.dart';
+export 'src/core/inference/sherpa/sherpa.dart';
 export 'src/core/logging/toolkit_logger.dart';
 export 'src/core/model_detector.dart';
 export 'src/core/model_info.dart';
@@ -44,8 +46,8 @@ export 'src/services/asr_service.dart';
 
 /// Entry point tying engines, providers and the chat/RAG layers together.
 ///
-/// Engines are plugins: the built-in ones (`llama`, `litert`, `asr`) are
-/// registered by [initialize]; image, video, speech-synthesis or any other
+/// Engines are plugins: the built-in ones (`llama`, `litert`, `asr`,
+/// `sherpa-asr`, `sherpa-tts`) are registered by [initialize]; image, video, speech-synthesis or any other
 /// engine can be added with [registerEngine] by implementing the matching
 /// capability interface.
 class LLMToolkit {
@@ -78,6 +80,8 @@ class LLMToolkit {
       registerEngine(LlamaEngine());
       registerEngine(LiteRtEngine(huggingFaceToken: huggingFaceApiKey));
       registerEngine(AsrEngine());
+      registerEngine(SherpaAsrEngine());
+      registerEngine(SherpaTtsEngine());
     }
   }
 
@@ -99,12 +103,14 @@ class LLMToolkit {
     String query, {
     String? provider,
     Set<ModelFormat> formats = const {},
+    ModelTask? task,
     int limit = 20,
     bool onlyRunnable = true,
   }) async {
     final q = SearchQuery(
       text: query,
       formats: formats,
+      tasks: {if (task != null) task},
       limit: limit,
       onlyRunnable: onlyRunnable,
     );

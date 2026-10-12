@@ -52,22 +52,13 @@ class HuggingFaceProvider extends BaseModelProvider {
   @override
   String get id => 'huggingface';
 
-  static const _formatTags = {
-    ModelFormat.gguf: 'gguf',
-    ModelFormat.litertlm: 'litert-lm',
-    ModelFormat.task: 'litert-lm',
-    ModelFormat.tflite: 'tflite',
-    ModelFormat.onnx: 'onnx',
-    ModelFormat.safetensors: 'safetensors',
-  };
-
   @override
   Future<List<ModelInfo>> searchModels(SearchQuery query) async {
-    final tags = {for (final f in query.formats) _formatTags[f]!};
+    if (query.isUnsatisfiable) return [];
+    final tags = {for (final f in query.searchFormats) f.hubTag};
+    final pipelineTags = query.allPipelineTags;
     final pipelines =
-        query.pipelineTags.isEmpty
-            ? <String?>[null]
-            : query.pipelineTags.toList();
+        pipelineTags.isEmpty ? <String?>[null] : pipelineTags.toList();
 
     final requests = [
       for (final tag in tags.isEmpty ? <String?>[null] : tags.toList())
@@ -116,9 +107,37 @@ class HuggingFaceProvider extends BaseModelProvider {
   }
 
   @override
+  Future<List<ModelFile>> listFiles(String modelId) async {
+    final files = <ModelFile>[];
+    Uri? next = _apiUri('models/$modelId/tree/main', {'recursive': 'true'});
+    while (next != null) {
+      final response = await _get(next, notFound: 'Model "$modelId" not found');
+      final json = jsonDecode(response.data ?? 'null');
+      if (json is! List) {
+        throw const ModelProviderException('Unexpected Hugging Face tree');
+      }
+      files.addAll(HfParser.treeFiles(modelId, json, endpoint: endpoint));
+      next = _nextPage(response.headers.value('link'));
+    }
+    return files;
+  }
+
+  @override
+  Future<DownloadTask> startFileDownload(String modelId, ModelFile file) =>
+      _enqueue(modelId, file.filename, file);
+
+  @override
   Future<DownloadTask> startDownload(String modelId, String filename) async {
     final details = await getModelDetails(modelId);
     final file = details.files.where((f) => f.filename == filename).firstOrNull;
+    return _enqueue(modelId, filename, file);
+  }
+
+  Future<DownloadTask> _enqueue(
+    String modelId,
+    String filename,
+    ModelFile? file,
+  ) async {
     final store = _store ?? await ModelStore.defaultStore();
     final request = DownloadRequest(
       url: HfParser.resolveUrl(endpoint, modelId, filename),
@@ -129,6 +148,13 @@ class HuggingFaceProvider extends BaseModelProvider {
     );
     ToolkitLog.info(_tag, 'Downloading $modelId/$filename');
     return _downloads.enqueue(request);
+  }
+
+  static final _nextLink = RegExp(r'<([^>]+)>\s*;\s*rel="next"');
+
+  static Uri? _nextPage(String? linkHeader) {
+    final url = _nextLink.firstMatch(linkHeader ?? '')?.group(1);
+    return url == null ? null : Uri.parse(url);
   }
 
   @override
@@ -172,10 +198,11 @@ class HuggingFaceProvider extends BaseModelProvider {
 
   bool _matches(ModelInfo m, SearchQuery q) {
     if (q.minDownloads != null && m.downloads < q.minDownloads!) return false;
-    if (q.formats.isNotEmpty) {
-      return m.files.any((f) => q.formats.contains(f.format));
+    final formats = q.searchFormats;
+    if (formats.isNotEmpty && !m.files.any((f) => formats.contains(f.format))) {
+      return false;
     }
-    return !q.onlyRunnable || m.hasLoadableFiles;
+    return !q.onlyRunnable || m.runnableBy != null;
   }
 
   int _compare(ModelInfo a, ModelInfo b, SearchQuery q) {
@@ -209,18 +236,24 @@ class HuggingFaceProvider extends BaseModelProvider {
     });
   }
 
-  Future<Object?> _getJson(Uri uri, {String? notFound}) async {
+  Future<Response<String>> _get(Uri uri, {String? notFound}) async {
     try {
-      final response = await _dio.getUri<String>(
+      return await _dio.getUri<String>(
         uri,
         options: Options(
           headers: _authHeaders,
           responseType: ResponseType.plain,
         ),
       );
-      return jsonDecode(response.data ?? 'null');
     } on DioException catch (e) {
       throw _mapError(e, notFound);
+    }
+  }
+
+  Future<Object?> _getJson(Uri uri, {String? notFound}) async {
+    final response = await _get(uri, notFound: notFound);
+    try {
+      return jsonDecode(response.data ?? 'null');
     } on FormatException catch (e) {
       throw ModelProviderException('Hugging Face returned invalid JSON', e);
     }

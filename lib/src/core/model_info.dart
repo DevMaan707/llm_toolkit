@@ -1,19 +1,114 @@
+/// Ids of the engines the toolkit ships (see `InferenceEngine.id`).
+abstract final class EngineIds {
+  static const llama = 'llama';
+  static const litert = 'litert';
+  static const asr = 'asr';
+  static const sherpaAsr = 'sherpa-asr';
+  static const sherpaTts = 'sherpa-tts';
+  static const ollama = 'ollama';
+}
+
+/// What a model does, derived from the Hub's `pipeline_tag`.
+enum ModelTask {
+  textGeneration(
+    'Text generation',
+    ['text-generation'],
+    aliases: ['text2text-generation', 'conversational'],
+  ),
+  vision(
+    'Vision',
+    ['image-text-to-text'],
+    aliases: ['image-to-text', 'visual-question-answering'],
+  ),
+  embedding('Embedding', ['feature-extraction', 'sentence-similarity']),
+  speechToText('Speech to text', ['automatic-speech-recognition']),
+  textToSpeech('Text to speech', ['text-to-speech']),
+  imageGeneration(
+    'Image generation',
+    ['text-to-image'],
+    aliases: ['image-to-image'],
+  ),
+  videoGeneration(
+    'Video generation',
+    ['text-to-video'],
+    aliases: ['image-to-video'],
+  );
+
+  const ModelTask(this.label, this.pipelineTags, {this.aliases = const []});
+
+  final String label;
+
+  /// Hub `pipeline_tag` values searched for this task.
+  final List<String> pipelineTags;
+
+  /// Further tags that map to this task when classifying a model.
+  final List<String> aliases;
+
+  /// Formats the built-in engines can run for this task; empty when the
+  /// toolkit cannot run it locally (use a remote engine instead).
+  Set<ModelFormat> get runnableFormats => switch (this) {
+    textGeneration ||
+    vision => const {ModelFormat.gguf, ModelFormat.litertlm, ModelFormat.task},
+    embedding => const {ModelFormat.gguf},
+    speechToText => const {ModelFormat.tflite, ModelFormat.onnx},
+    textToSpeech => const {ModelFormat.onnx},
+    imageGeneration || videoGeneration => const {},
+  };
+
+  /// Task for a Hub `pipeline_tag`, or `null` when it is not one we model.
+  static ModelTask? fromPipelineTag(String? tag) {
+    if (tag == null) return null;
+    for (final task in values) {
+      if (task.pipelineTags.contains(tag) || task.aliases.contains(tag)) {
+        return task;
+      }
+    }
+    return null;
+  }
+}
+
+/// Multi-file model layouts that must be downloaded as a folder.
+enum ModelBundle {
+  /// sherpa-onnx: several `.onnx` graphs plus `tokens.txt` (and lexicons).
+  sherpaOnnx;
+
+  /// Detects a bundle from Hub [tags] and all repository [filenames].
+  static ModelBundle? detect(
+    Iterable<String> tags,
+    Iterable<String> filenames,
+  ) {
+    if (tags.contains('sherpa-onnx')) return sherpaOnnx;
+    var onnx = false;
+    var tokens = false;
+    for (final name in filenames) {
+      final lower = name.toLowerCase();
+      onnx |= lower.endsWith('.onnx');
+      tokens |= lower.endsWith('tokens.txt');
+    }
+    return onnx && tokens ? sherpaOnnx : null;
+  }
+}
+
 /// On-disk model formats the toolkit knows about.
 enum ModelFormat {
-  gguf('gguf'),
-  litertlm('litertlm'),
-  task('task'),
-  tflite('tflite'),
-  onnx('onnx'),
-  safetensors('safetensors');
+  gguf('gguf', 'gguf'),
+  litertlm('litertlm', 'litert-lm'),
+  task('task', 'litert-lm'),
+  tflite('tflite', 'tflite'),
+  litert('litert', 'litert'),
+  onnx('onnx', 'onnx'),
+  safetensors('safetensors', 'safetensors');
 
-  const ModelFormat(this.extension);
+  const ModelFormat(this.extension, this.hubTag);
 
   /// File extension without the dot.
   final String extension;
 
+  /// Hub `filter` tag that finds repositories shipping this format.
+  final String hubTag;
+
   /// Whether an inference engine in this toolkit can load the format.
-  bool get isRunnable => this != safetensors;
+  bool get isRunnable => this != safetensors && this != litert;
 
   /// Format of [filename], or `null` when it is not a model weights file.
   static ModelFormat? fromFilename(String filename) {
@@ -152,6 +247,13 @@ class ModelInfo {
   /// Total size when the provider reports one for the whole model.
   final int? sizeBytes;
 
+  /// Folder layout the model needs, if it is not a single weights file.
+  final ModelBundle? bundle;
+
+  /// Engine that runs the model, when the provider knows it (for example a
+  /// local server); otherwise [runnableBy] infers it.
+  final String? runtime;
+
   const ModelInfo({
     required this.id,
     required this.name,
@@ -171,7 +273,43 @@ class ModelInfo {
     this.contextLength,
     this.quantization,
     this.sizeBytes,
+    this.bundle,
+    this.runtime,
   });
+
+  /// Task parsed from [pipelineTag].
+  ModelTask? get task => ModelTask.fromPipelineTag(pipelineTag);
+
+  /// Id of the built-in engine that can run this model, or `null` when none
+  /// can (image/video generation, graphs needing a custom pipeline, ...).
+  ///
+  /// Models without a known task are treated as text generation.
+  String? get runnableBy {
+    if (runtime != null) return runtime;
+    final formats = {for (final f in loadableFiles) f.format!};
+    bool any(Set<ModelFormat> wanted) => formats.any(wanted.contains);
+    return switch (task ?? ModelTask.textGeneration) {
+      ModelTask.textGeneration || ModelTask.vision =>
+        any({ModelFormat.gguf})
+            ? EngineIds.llama
+            : any({ModelFormat.litertlm, ModelFormat.task})
+            ? EngineIds.litert
+            : null,
+      ModelTask.embedding => any({ModelFormat.gguf}) ? EngineIds.llama : null,
+      ModelTask.speechToText =>
+        bundle == ModelBundle.sherpaOnnx && any({ModelFormat.onnx})
+            ? EngineIds.sherpaAsr
+            : formats.contains(ModelFormat.tflite) &&
+                id.toLowerCase().contains('whisper')
+            ? EngineIds.asr
+            : null,
+      ModelTask.textToSpeech =>
+        bundle == ModelBundle.sherpaOnnx && any({ModelFormat.onnx})
+            ? EngineIds.sherpaTts
+            : null,
+      ModelTask.imageGeneration || ModelTask.videoGeneration => null,
+    };
+  }
 
   Set<ModelFormat> get formats => {
     for (final f in files)
@@ -240,6 +378,8 @@ class ModelInfo {
     contextLength: contextLength,
     quantization: quantization,
     sizeBytes: sizeBytes,
+    bundle: bundle,
+    runtime: runtime,
   );
 
   @override

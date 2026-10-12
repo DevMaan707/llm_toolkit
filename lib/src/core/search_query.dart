@@ -30,7 +30,10 @@ class SearchQuery {
   /// Only models that ship one of these formats; empty means any.
   final Set<ModelFormat> formats;
 
-  /// Hub `pipeline_tag` values; a model matches any of them.
+  /// Tasks to search for (Hub `pipeline_tag`); a model matches any of them.
+  final Set<ModelTask> tasks;
+
+  /// Extra raw Hub `pipeline_tag` values searched in addition to [tasks].
   final Set<String> pipelineTags;
 
   /// Hub library tag such as `transformers`.
@@ -44,7 +47,10 @@ class SearchQuery {
   final ModelSort sort;
   final bool descending;
 
-  /// Keep only models with at least one file the toolkit can run.
+  /// Keep only models some built-in engine can run (`ModelInfo.runnableBy`).
+  ///
+  /// With [tasks] set and no [formats], only the formats runnable for those
+  /// tasks are searched.
   final bool onlyRunnable;
 
   /// Fetch per-file sizes and hashes (one extra request per result).
@@ -53,6 +59,7 @@ class SearchQuery {
   const SearchQuery({
     this.text = '',
     this.formats = const {},
+    this.tasks = const {},
     this.pipelineTags = const {},
     this.library,
     this.author,
@@ -64,4 +71,26 @@ class SearchQuery {
     this.onlyRunnable = true,
     this.includeFileSizes = true,
   }) : assert(limit > 0, 'limit must be positive');
+
+  /// Every `pipeline_tag` to query: those of [tasks] plus [pipelineTags].
+  Set<String> get allPipelineTags => {
+    for (final t in tasks) ...t.pipelineTags,
+    ...pipelineTags,
+  };
+
+  /// Formats to search: [formats], or the runnable ones of [tasks] when only
+  /// runnable models are wanted.
+  Set<ModelFormat> get searchFormats {
+    if (formats.isNotEmpty || !onlyRunnable || tasks.isEmpty) return formats;
+    return {for (final t in tasks) ...t.runnableFormats};
+  }
+
+  /// Whether no model can match: runnable-only search for tasks the toolkit
+  /// cannot run locally.
+  bool get isUnsatisfiable =>
+      formats.isEmpty &&
+      onlyRunnable &&
+      tasks.isNotEmpty &&
+      pipelineTags.isEmpty &&
+      searchFormats.isEmpty;
 }

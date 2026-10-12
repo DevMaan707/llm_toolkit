@@ -1,5 +1,9 @@
+import 'dart:io';
+
+import '../exceptions/llm_toolkit_exceptions.dart';
 import 'config.dart';
 import 'inference/base_inference_engine.dart';
+import 'inference/sherpa/sherpa_layout.dart';
 
 /// Result of inspecting a model file name.
 class DetectedModel {
@@ -13,7 +17,8 @@ class DetectedModel {
 /// Picks an engine id for a model file based on its extension and name.
 ///
 /// Engine ids are the ones used by the built-in engines (`llama`, `litert`,
-/// `asr`). Custom engines can be selected explicitly with `engineId`.
+/// `asr`, `sherpa-asr`, `sherpa-tts`). Folders holding sherpa-onnx speech
+/// models are recognised by their contents. Custom engines can be selected explicitly with `engineId`.
 class ModelDetector {
   const ModelDetector();
 
@@ -25,6 +30,32 @@ class ModelDetector {
     'deepspeech',
     'moonshine',
     'parakeet',
+  ];
+  static const _sherpaTtsKeywords = [
+    'kokoro',
+    'piper',
+    'vits',
+    'matcha',
+    'kitten',
+  ];
+  static const _sherpaAsrKeywords = [
+    'whisper',
+    'moonshine',
+    'parakeet',
+    'zipformer',
+    'sense-voice',
+    'sensevoice',
+    'paraformer',
+    'sherpa-onnx',
+  ];
+  static const _otherFormats = [
+    '.gguf',
+    '.ggml',
+    '.litertlm',
+    '.task',
+    '.tflite',
+    '.bin',
+    '.safetensors',
   ];
   static const _embeddingKeywords = [
     'embed',
@@ -39,6 +70,9 @@ class ModelDetector {
   DetectedModel detect(String modelPath) {
     final name = modelPath.split(RegExp(r'[\\/]')).last.toLowerCase();
     final family = detectFamily(name);
+
+    final sherpa = _detectSherpa(modelPath, name, family);
+    if (sherpa != null) return sherpa;
 
     if (name.endsWith('.tflite') && isASR(name)) {
       return DetectedModel('asr', {ModelCapability.speechToText}, family);
@@ -63,6 +97,40 @@ class ModelDetector {
       return DetectedModel('litert', {ModelCapability.textGeneration}, family);
     }
     return DetectedModel('llama', {ModelCapability.textGeneration}, family);
+  }
+
+  DetectedModel? _detectSherpa(String path, String name, ModelFamily family) {
+    if (Directory(path).existsSync()) {
+      try {
+        return switch (SherpaModelLayout.detect(Directory(path))) {
+          SherpaAsrLayout() => DetectedModel('sherpa-asr', {
+            ModelCapability.speechToText,
+          }, family),
+          SherpaTtsLayout() => DetectedModel('sherpa-tts', {
+            ModelCapability.textToSpeech,
+          }, family),
+        };
+      } on InferenceException {
+        return _sherpaByName(name, family);
+      }
+    }
+    return _otherFormats.any(name.endsWith)
+        ? null
+        : _sherpaByName(name, family);
+  }
+
+  DetectedModel? _sherpaByName(String name, ModelFamily family) {
+    if (_sherpaTtsKeywords.any(name.contains)) {
+      return DetectedModel('sherpa-tts', {
+        ModelCapability.textToSpeech,
+      }, family);
+    }
+    if (_sherpaAsrKeywords.any(name.contains)) {
+      return DetectedModel('sherpa-asr', {
+        ModelCapability.speechToText,
+      }, family);
+    }
+    return null;
   }
 
   bool isASR(String fileName) =>
